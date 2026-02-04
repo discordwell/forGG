@@ -59,8 +59,12 @@ export function PlaybackControls() {
       {/* Step controls */}
       <div className="flex items-center gap-0.5 border-l border-surface-700 pl-3">
         <button
-          onClick={() => dispatch({ type: 'STEP_BACK' })}
-          disabled={isIdle}
+          onClick={() => {
+            if (isPaused) {
+              dispatch({ type: 'STEP_BACK' });
+            }
+          }}
+          disabled={!isPaused}
           className="p-1.5 text-surface-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           title="Step Back"
         >

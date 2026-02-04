@@ -1,6 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
-  useContext,
   useReducer,
   type ReactNode,
   type Dispatch,
@@ -277,8 +277,8 @@ function automationReducer(
   }
 }
 
-const AutomationContext = createContext<AutomationState>(initialState);
-const AutomationDispatchContext = createContext<Dispatch<AutomationAction>>(
+export const AutomationContext = createContext<AutomationState>(initialState);
+export const AutomationDispatchContext = createContext<Dispatch<AutomationAction>>(
   () => {}
 );
 
@@ -294,10 +294,5 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAutomation() {
-  return useContext(AutomationContext);
-}
-
-export function useAutomationDispatch() {
-  return useContext(AutomationDispatchContext);
-}
+// Re-export hooks from separate file for backwards compatibility
+export { useAutomation, useAutomationDispatch } from './useAutomationHooks';

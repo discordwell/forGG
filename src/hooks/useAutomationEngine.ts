@@ -162,11 +162,13 @@ export function useAutomationEngine() {
           dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
           break;
 
-        case 'wait':
-          auditMessage = `Waited ${step.value || '1000'}ms`;
+        case 'wait': {
+          const waitMs = parseInt(step.value || '1000', 10) || 1000;
+          auditMessage = `Waited ${waitMs}ms`;
           severity = 'info';
-          await scaledDelay(parseInt(step.value || '1000', 10));
+          await scaledDelay(waitMs);
           break;
+        }
 
         case 'scroll':
           auditMessage = `Scrolled to ${step.target}`;
@@ -255,6 +257,11 @@ export function useAutomationEngine() {
     }
 
     runAllSteps();
+
+    return () => {
+      abortRef.current = true;
+      runningRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution.status, execution.currentStepIndex]);
 
