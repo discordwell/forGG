@@ -28,7 +28,7 @@ const initialExecution: ExecutionState = {
   startTime: null,
   endTime: null,
   speed: 1,
-  currentPage: 'login',
+  currentPage: 'google-search',
   cursorPosition: { x: 400, y: 300 },
   activeHighlight: null,
   showFlash: false,

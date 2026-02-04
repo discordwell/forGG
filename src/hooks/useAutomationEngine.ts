@@ -257,19 +257,24 @@ export function useAutomationEngine() {
     }
 
     runAllSteps();
-
-    return () => {
-      abortRef.current = true;
-      runningRef.current = false;
-    };
+    // No cleanup here — changing currentStepIndex must NOT abort the loop.
+    // Abort is handled by the stop/reset effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution.status, execution.currentStepIndex]);
 
-  // Handle stop / reset
+  // Abort on stop, reset, or completion
   useEffect(() => {
     if (execution.status === 'idle' || execution.status === 'completed') {
       abortRef.current = true;
       runningRef.current = false;
     }
   }, [execution.status]);
+
+  // Cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      abortRef.current = true;
+      runningRef.current = false;
+    };
+  }, []);
 }

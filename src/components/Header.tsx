@@ -2,7 +2,7 @@ import { Workflow, Zap } from 'lucide-react';
 import { useAutomation } from '../context/AutomationContext';
 import { ProgressBar } from './shared/ProgressBar';
 import { PlaybackControls } from './playback/PlaybackControls';
-import { KYC_SCENARIO_NAME } from '../data/kyc-scenario';
+import { SCENARIO_NAME } from '../data/kyc-scenario';
 
 export function Header() {
   const { steps, execution } = useAutomation();
@@ -23,7 +23,7 @@ export function Header() {
             </span>
           </div>
           <p className="text-[10px] text-surface-500 truncate max-w-xs">
-            {KYC_SCENARIO_NAME}
+            {SCENARIO_NAME}
           </p>
         </div>
       </div>

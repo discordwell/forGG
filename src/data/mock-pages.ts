@@ -5,29 +5,29 @@ export interface MockPageDef {
 }
 
 export const MOCK_PAGES: Record<string, MockPageDef> = {
-  login: {
-    id: 'login',
-    title: 'Sign In — AcmeCorp Comply',
-    url: 'https://comply.acmecorp.io/login',
+  'google-search': {
+    id: 'google-search',
+    title: 'chichijima island accommodation english booking - Google Search',
+    url: 'https://www.google.com/search?q=chichijima+island+accommodation+english+booking',
   },
-  dashboard: {
-    id: 'dashboard',
-    title: 'Case Management Dashboard — AcmeCorp Comply',
-    url: 'https://comply.acmecorp.io/dashboard',
+  'wix-guesthouse': {
+    id: 'wix-guesthouse',
+    title: 'Sea Glass Inn — Chichijima Island Guesthouse',
+    url: 'https://www.seaglassinn-chichijima.com',
   },
-  'customer-profile': {
-    id: 'customer-profile',
-    title: 'Customer Profile — Marcus Chen — AcmeCorp Comply',
-    url: 'https://comply.acmecorp.io/customers/4892',
+  'booking-listing': {
+    id: 'booking-listing',
+    title: 'Sea Glass Inn, Chichijima — Booking.com',
+    url: 'https://www.booking.com/hotel/jp/sea-glass-inn-chichijima.html',
   },
-  'alert-review': {
-    id: 'alert-review',
-    title: 'AML Alert AML-2024-8891 — AcmeCorp Comply',
-    url: 'https://comply.acmecorp.io/alerts/AML-2024-8891',
+  'agoda-listing': {
+    id: 'agoda-listing',
+    title: 'Sea Glass Inn (Chichijima) — Agoda',
+    url: 'https://www.agoda.com/sea-glass-inn-chichijima/hotel/ogasawara-jp.html',
   },
-  'document-viewer': {
-    id: 'document-viewer',
-    title: 'Document Verification — Marcus Chen — AcmeCorp Comply',
-    url: 'https://comply.acmecorp.io/customers/4892/documents',
+  'research-tracker': {
+    id: 'research-tracker',
+    title: 'Chichijima Accommodation Research — Google Sheets',
+    url: 'https://docs.google.com/spreadsheets/d/1a2b3c/chichijima-research',
   },
 };

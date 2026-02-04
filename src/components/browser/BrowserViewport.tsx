@@ -1,23 +1,23 @@
 import { useAutomation } from '../../context/AutomationContext';
-import { LoginPage } from '../../pages/LoginPage';
-import { DashboardPage } from '../../pages/DashboardPage';
-import { CustomerProfilePage } from '../../pages/CustomerProfilePage';
-import { AlertReviewPage } from '../../pages/AlertReviewPage';
-import { DocumentViewerPage } from '../../pages/DocumentViewerPage';
+import { GoogleSearchPage } from '../../pages/GoogleSearchPage';
+import { WixGuesthousePage } from '../../pages/WixGuesthousePage';
+import { BookingListingPage } from '../../pages/BookingListingPage';
+import { AgodaListingPage } from '../../pages/AgodaListingPage';
+import { ResearchTrackerPage } from '../../pages/ResearchTrackerPage';
 import { SimulatedCursor } from './SimulatedCursor';
 import { HighlightOverlay } from './HighlightOverlay';
 
 const PAGE_COMPONENTS: Record<string, React.FC> = {
-  login: LoginPage,
-  dashboard: DashboardPage,
-  'customer-profile': CustomerProfilePage,
-  'alert-review': AlertReviewPage,
-  'document-viewer': DocumentViewerPage,
+  'google-search': GoogleSearchPage,
+  'wix-guesthouse': WixGuesthousePage,
+  'booking-listing': BookingListingPage,
+  'agoda-listing': AgodaListingPage,
+  'research-tracker': ResearchTrackerPage,
 };
 
 export function BrowserViewport() {
   const { execution } = useAutomation();
-  const PageComponent = PAGE_COMPONENTS[execution.currentPage] || LoginPage;
+  const PageComponent = PAGE_COMPONENTS[execution.currentPage] || GoogleSearchPage;
 
   return (
     <div className="flex-1 relative overflow-hidden">
