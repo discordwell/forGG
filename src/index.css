@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forge-50: #f0f4ff;
+  --color-forge-100: #dbe4ff;
+  --color-forge-200: #bac8ff;
+  --color-forge-300: #91a7ff;
+  --color-forge-400: #748ffc;
+  --color-forge-500: #5c7cfa;
+  --color-forge-600: #4c6ef5;
+  --color-forge-700: #4263eb;
+  --color-forge-800: #3b5bdb;
+  --color-forge-900: #364fc7;
+
+  --color-surface-0: #ffffff;
+  --color-surface-50: #f8f9fa;
+  --color-surface-100: #f1f3f5;
+  --color-surface-200: #e9ecef;
+  --color-surface-300: #dee2e6;
+  --color-surface-400: #ced4da;
+  --color-surface-500: #adb5bd;
+  --color-surface-600: #868e96;
+  --color-surface-700: #495057;
+  --color-surface-800: #343a40;
+  --color-surface-900: #212529;
+
+  --color-success: #40c057;
+  --color-warning: #fab005;
+  --color-danger: #fa5252;
+  --color-info: #339af0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-surface-50);
+  color: var(--color-surface-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-300);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-400);
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(92, 124, 250, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(92, 124, 250, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(92, 124, 250, 0); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes flash {
+  0% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s ease-in-out infinite;
+}
+
+.animate-scanline {
+  animation: scanline 0.8s ease-in-out;
+}
+
+.animate-flash {
+  animation: flash 0.3s ease-out forwards;
+}
+
+.animate-ripple {
+  animation: ripple 0.5s ease-out forwards;
+}
