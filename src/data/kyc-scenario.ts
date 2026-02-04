@@ -5,7 +5,7 @@ export const SCENARIO_NAME = 'Chichijima Accommodation — Competitive Research'
 export const SCENARIO_DESCRIPTION =
   'Automated competitive research workflow for Chichijima island accommodations: scraping Wix guesthouse sites, cross-referencing OTA listings on Booking.com and Agoda, and logging findings to a research tracker.';
 
-export function createKycScenario(): AutomationStep[] {
+export function createScenario(): AutomationStep[] {
   return [
     // 1. Google Search
     {

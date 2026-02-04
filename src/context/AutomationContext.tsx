@@ -11,14 +11,14 @@ import type {
   ExecutionState,
   StepStatus,
 } from '../types/automation';
-import { createKycScenario } from '../data/kyc-scenario';
+import { createScenario } from '../data/kyc-scenario';
 
 export interface AutomationState {
   steps: AutomationStep[];
   execution: ExecutionState;
 }
 
-const initialSteps = createKycScenario();
+const initialSteps = createScenario();
 
 const initialExecution: ExecutionState = {
   status: 'idle',
@@ -112,7 +112,7 @@ function automationReducer(
           currentStepIndex: 0,
           stepStatuses: state.steps.map(() => 'pending'),
           startTime: new Date(),
-          currentPage: state.steps[0]?.page || 'login',
+          currentPage: state.steps[0]?.page || 'google-search',
         },
       };
 
