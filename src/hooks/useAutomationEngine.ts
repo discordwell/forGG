@@ -1,280 +1,198 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { nanoid } from 'nanoid';
-import type { AutomationStep, AuditLogEntry, Severity } from '../types/automation';
+import { useEffect, useRef } from 'react';
+import type { AuditLogEntry, AutomationStep, StepStatus } from '../types/automation';
 import { useAutomation, useAutomationDispatch } from '../context/AutomationContext';
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+type RunEvent =
+  | { type: 'run_started'; runId: string; ts: number }
+  | { type: 'run_paused'; runId: string; ts: number }
+  | { type: 'run_resumed'; runId: string; ts: number }
+  | { type: 'run_aborted'; runId: string; ts: number }
+  | { type: 'run_completed'; runId: string; ts: number }
+  | { type: 'run_failed'; runId: string; ts: number; error: string }
+  | { type: 'step_started'; runId: string; ts: number; index: number; step: AutomationStep }
+  | { type: 'step_status'; runId: string; ts: number; index: number; status: StepStatus }
+  | { type: 'audit_entry'; runId: string; ts: number; entry: Omit<AuditLogEntry, 'timestamp'> & { timestamp: string } }
+  | { type: 'ui'; runId: string; ts: number; action: { kind: 'cursor'; position: { x: number; y: number } } }
+  | { type: 'ui'; runId: string; ts: number; action: { kind: 'page'; page: string } }
+  | { type: 'ui'; runId: string; ts: number; action: { kind: 'typing'; target: string; text: string } }
+  | { type: 'ui'; runId: string; ts: number; action: { kind: 'flash'; show: boolean } }
+  | { type: 'ui'; runId: string; ts: number; action: { kind: 'scanline'; show: boolean } };
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Request failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as T;
 }
 
 export function useAutomationEngine() {
   const { steps, execution } = useAutomation();
   const dispatch = useAutomationDispatch();
-  const abortRef = useRef(false);
-  const pauseRef = useRef(false);
-  const speedRef = useRef(execution.speed);
-  const runningRef = useRef(false);
+
   const stepsRef = useRef(steps);
-
-  // Keep refs in sync
   stepsRef.current = steps;
-  speedRef.current = execution.speed;
-  pauseRef.current = execution.status === 'paused';
+  const statusRef = useRef(execution.status);
+  statusRef.current = execution.status;
 
-  const scaledDelay = useCallback(
-    (ms: number) => sleep(ms / speedRef.current),
-    []
-  );
+  const startedRef = useRef(false);
+  const runIdRef = useRef<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
-  const waitForUnpause = useCallback(async () => {
-    while (pauseRef.current && !abortRef.current) {
-      await sleep(100);
+  function closeStream() {
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
     }
-  }, []);
+  }
 
-  const executeStep = useCallback(
-    async (step: AutomationStep, index: number) => {
-      if (abortRef.current) return;
-      await waitForUnpause();
-
-      dispatch({ type: 'SET_STEP_INDEX', index });
-      dispatch({ type: 'SET_STEP_STATUS', index, status: 'running' });
-
-      // Navigate to the right page
-      if (step.page) {
-        dispatch({ type: 'SET_CURRENT_PAGE', page: step.page });
-        await scaledDelay(400);
-      }
-
-      // Move cursor to target
-      if (step.targetCoords) {
-        dispatch({ type: 'SET_CURSOR_POSITION', position: step.targetCoords });
-        await scaledDelay(600);
-      }
-
-      let auditMessage = '';
-      let severity: Severity = 'info';
-      let extras: Partial<AuditLogEntry> = {};
-
-      switch (step.type) {
-        case 'navigate':
-          auditMessage = `Navigated to ${step.value}`;
-          severity = 'info';
-          await scaledDelay(500);
-          break;
-
-        case 'click':
-          if (step.targetCoords) {
-            dispatch({ type: 'SET_RIPPLE', position: step.targetCoords });
-            dispatch({
-              type: 'SET_HIGHLIGHT',
-              highlight: {
-                x: step.targetCoords.x - 60,
-                y: step.targetCoords.y - 15,
-                w: 120,
-                h: 30,
-              },
-            });
-          }
-          auditMessage = `Clicked element: ${step.target || step.label}`;
-          severity = 'info';
-          await scaledDelay(400);
-          dispatch({ type: 'SET_RIPPLE', position: null });
-          dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
-          break;
-
-        case 'type': {
-          const text = step.value || '';
-          if (step.targetCoords) {
-            dispatch({
-              type: 'SET_HIGHLIGHT',
-              highlight: {
-                x: step.targetCoords.x - 120,
-                y: step.targetCoords.y - 15,
-                w: 240,
-                h: 30,
-              },
-            });
-          }
-          for (let i = 0; i <= text.length; i++) {
-            if (abortRef.current) return;
-            await waitForUnpause();
-            dispatch({
-              type: 'SET_TYPING',
-              text: text.slice(0, i),
-              target: step.target || '',
-            });
-            await scaledDelay(40 + Math.random() * 40);
-          }
-          auditMessage = `Typed "${text}" into ${step.target}`;
-          severity = 'info';
-          await scaledDelay(200);
-          dispatch({ type: 'SET_TYPING', text: '', target: '' });
-          dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
-          break;
-        }
-
-        case 'extract':
-          dispatch({ type: 'SET_SCANLINE', show: true });
-          if (step.targetCoords) {
-            dispatch({
-              type: 'SET_HIGHLIGHT',
-              highlight: {
-                x: step.targetCoords.x - 100,
-                y: step.targetCoords.y - 60,
-                w: 200,
-                h: 120,
-              },
-            });
-          }
-          auditMessage = `Extracted data from ${step.target}`;
-          severity = 'success';
-          extras = { extractedData: step.extractedData };
-          await scaledDelay(1200);
-          dispatch({ type: 'SET_SCANLINE', show: false });
-          dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
-          break;
-
-        case 'screenshot':
-          dispatch({ type: 'SET_FLASH', show: true });
-          auditMessage = 'Screenshot captured';
-          severity = 'info';
-          extras = { screenshotUrl: `screenshot_step_${index + 1}.png` };
-          await scaledDelay(400);
-          dispatch({ type: 'SET_FLASH', show: false });
-          break;
-
-        case 'assert':
-          if (step.targetCoords) {
-            dispatch({
-              type: 'SET_HIGHLIGHT',
-              highlight: {
-                x: step.targetCoords.x - 80,
-                y: step.targetCoords.y - 15,
-                w: 160,
-                h: 30,
-              },
-            });
-          }
-          auditMessage = `Assertion passed: ${step.target} ${step.assertion || 'equals'} "${step.value}"`;
-          severity = 'success';
-          await scaledDelay(600);
-          dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
-          break;
-
-        case 'wait': {
-          const waitMs = parseInt(step.value || '1000', 10) || 1000;
-          auditMessage = `Waited ${waitMs}ms`;
-          severity = 'info';
-          await scaledDelay(waitMs);
-          break;
-        }
-
-        case 'scroll':
-          auditMessage = `Scrolled to ${step.target}`;
-          severity = 'info';
-          if (step.targetCoords) {
-            dispatch({
-              type: 'SET_CURSOR_POSITION',
-              position: step.targetCoords,
-            });
-          }
-          await scaledDelay(500);
-          break;
-
-        case 'select':
-          if (step.targetCoords) {
-            dispatch({
-              type: 'SET_HIGHLIGHT',
-              highlight: {
-                x: step.targetCoords.x - 120,
-                y: step.targetCoords.y - 15,
-                w: 240,
-                h: 30,
-              },
-            });
-          }
-          dispatch({
-            type: 'SET_TYPING',
-            text: step.value || '',
-            target: step.target || '',
-          });
-          auditMessage = `Selected "${step.value}" from ${step.target}`;
-          severity = 'info';
-          await scaledDelay(800);
-          dispatch({ type: 'SET_TYPING', text: '', target: '' });
-          dispatch({ type: 'SET_HIGHLIGHT', highlight: null });
-          break;
-      }
-
-      dispatch({ type: 'SET_STEP_STATUS', index, status: 'passed' });
-
-      const entry: AuditLogEntry = {
-        id: nanoid(),
-        stepId: step.id,
-        stepIndex: index,
-        timestamp: new Date(),
-        type: step.type,
-        label: step.label,
-        severity,
-        message: auditMessage,
-        status: 'passed',
-        duration: Math.round(100 + Math.random() * 400),
-        ...extras,
-      };
-      dispatch({ type: 'ADD_AUDIT_ENTRY', entry });
-    },
-    [dispatch, scaledDelay, waitForUnpause]
-  );
-
-  // Main execution loop — triggered when START_EXECUTION sets status to 'running' and index to 0
-  useEffect(() => {
-    if (execution.status !== 'running' || execution.currentStepIndex !== 0 || runningRef.current) {
-      return;
+  async function abortRemoteRun() {
+    const runId = runIdRef.current;
+    if (!runId) return;
+    try {
+      await postJson(`/api/runs/${runId}/abort`, {});
+    } catch {
+      // ignore
+    } finally {
+      runIdRef.current = null;
+      closeStream();
     }
+  }
 
-    runningRef.current = true;
-    abortRef.current = false;
-
-    async function runAllSteps() {
-      const allSteps = stepsRef.current;
-      for (let i = 0; i < allSteps.length; i++) {
-        if (abortRef.current) break;
-        await waitForUnpause();
-        if (abortRef.current) break;
-
-        await executeStep(allSteps[i], i);
-
-        if (abortRef.current) break;
-
-        await scaledDelay(300);
+  function handleEvent(ev: RunEvent) {
+    switch (ev.type) {
+      case 'step_started': {
+        dispatch({ type: 'SET_STEP_INDEX', index: ev.index });
+        if (ev.step.page) dispatch({ type: 'SET_CURRENT_PAGE', page: ev.step.page });
+        if (ev.step.targetCoords) dispatch({ type: 'SET_CURSOR_POSITION', position: ev.step.targetCoords });
+        break;
       }
-
-      runningRef.current = false;
-      if (!abortRef.current) {
+      case 'step_status': {
+        dispatch({ type: 'SET_STEP_STATUS', index: ev.index, status: ev.status });
+        break;
+      }
+      case 'audit_entry': {
+        dispatch({
+          type: 'ADD_AUDIT_ENTRY',
+          entry: {
+            ...ev.entry,
+            timestamp: new Date(ev.entry.timestamp),
+          },
+        });
+        break;
+      }
+      case 'ui': {
+        const a = ev.action;
+        if (a.kind === 'cursor') dispatch({ type: 'SET_CURSOR_POSITION', position: a.position });
+        if (a.kind === 'page') dispatch({ type: 'SET_CURRENT_PAGE', page: a.page });
+        if (a.kind === 'typing') dispatch({ type: 'SET_TYPING', text: a.text, target: a.target });
+        if (a.kind === 'flash') dispatch({ type: 'SET_FLASH', show: a.show });
+        if (a.kind === 'scanline') dispatch({ type: 'SET_SCANLINE', show: a.show });
+        break;
+      }
+      case 'run_completed': {
+        startedRef.current = false;
+        runIdRef.current = null;
+        closeStream();
         dispatch({ type: 'COMPLETE_EXECUTION' });
+        break;
       }
+      case 'run_failed': {
+        startedRef.current = false;
+        runIdRef.current = null;
+        closeStream();
+        // Step statuses already include failures; render summary.
+        dispatch({ type: 'COMPLETE_EXECUTION' });
+        break;
+      }
+      case 'run_aborted': {
+        startedRef.current = false;
+        runIdRef.current = null;
+        closeStream();
+        break;
+      }
+      default:
+        break;
     }
+  }
 
-    runAllSteps();
-    // No cleanup here — changing currentStepIndex must NOT abort the loop.
-    // Abort is handled by the stop/reset effect below.
+  // Start the backend run when the UI transitions into running state.
+  useEffect(() => {
+    if (execution.status !== 'running') return;
+    if (execution.currentStepIndex !== 0) return;
+    if (startedRef.current) return;
+
+    startedRef.current = true;
+
+    (async () => {
+      const { runId } = await postJson<{ runId: string }>('/api/runs', {
+        steps: stepsRef.current,
+        speed: execution.speed,
+      });
+
+      runIdRef.current = runId;
+
+      // Handle race: user paused/stopped before the runId existed.
+      if (statusRef.current === 'paused') {
+        postJson(`/api/runs/${runId}/pause`, {}).catch(() => {});
+      }
+      if (statusRef.current === 'idle') {
+        postJson(`/api/runs/${runId}/abort`, {}).catch(() => {});
+      }
+
+      const es = new EventSource(`/api/runs/${runId}/events`);
+      esRef.current = es;
+
+      es.onmessage = (msg) => {
+        try {
+          const ev = JSON.parse(msg.data) as RunEvent;
+          handleEvent(ev);
+        } catch {
+          // ignore
+        }
+      };
+
+      es.onerror = () => {
+        // If the stream errors, stop attempting to drive UI. User can re-run.
+        closeStream();
+        runIdRef.current = null;
+        startedRef.current = false;
+      };
+    })().catch(() => {
+      startedRef.current = false;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution.status, execution.currentStepIndex]);
 
-  // Abort on stop, reset, or completion
+  // Pause / resume.
   useEffect(() => {
-    if (execution.status === 'idle' || execution.status === 'completed') {
-      abortRef.current = true;
-      runningRef.current = false;
+    const runId = runIdRef.current;
+    if (!runId) return;
+
+    if (execution.status === 'paused') {
+      postJson(`/api/runs/${runId}/pause`, {}).catch(() => {});
+    } else if (execution.status === 'running') {
+      postJson(`/api/runs/${runId}/resume`, {}).catch(() => {});
     }
   }, [execution.status]);
 
-  // Cleanup on unmount only
+  // Abort remote run if the UI is stopped.
+  useEffect(() => {
+    if (execution.status !== 'idle') return;
+    if (!runIdRef.current) return;
+    abortRemoteRun().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execution.status]);
+
+  // Cleanup on unmount.
   useEffect(() => {
     return () => {
-      abortRef.current = true;
-      runningRef.current = false;
+      closeStream();
     };
   }, []);
 }

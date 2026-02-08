@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { GripVertical, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { AutomationStep } from '../../types/automation';
 import { STEP_TYPE_META } from '../../constants/step-types';
@@ -20,10 +20,7 @@ export function StepCard({ step, index }: StepCardProps) {
   const isActive = execution.currentStepIndex === index && execution.status !== 'idle';
   const isRunning = execution.status === 'running' || execution.status === 'paused';
   const status = execution.stepStatuses[index];
-
-  useEffect(() => {
-    if (isRunning) setExpanded(false);
-  }, [isRunning]);
+  const expandedUi = expanded && !isRunning;
 
   return (
     <div
@@ -58,7 +55,7 @@ export function StepCard({ step, index }: StepCardProps) {
           disabled={isRunning}
           className="p-0.5 text-surface-400 hover:text-surface-600 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          {expanded ? (
+          {expandedUi ? (
             <ChevronDown className="w-3.5 h-3.5" />
           ) : (
             <ChevronRight className="w-3.5 h-3.5" />
@@ -66,7 +63,7 @@ export function StepCard({ step, index }: StepCardProps) {
         </button>
       </div>
 
-      {expanded && (
+      {expandedUi && (
         <div className="px-3 pb-3 pt-0 border-t border-surface-100">
           <div className="mt-2 space-y-2">
             <div>

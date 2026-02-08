@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Google Search (Sandbox)</title>
+    <style>
+      :root { --bg: #ffffff; --ink: #0f172a; --muted: #64748b; --ring: rgba(2,132,199,0.25); }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px; }
+      h1 { font-size: 28px; margin: 0 0 18px; letter-spacing: -0.02em; }
+      .bar { display: flex; gap: 10px; align-items: center; border: 1px solid #e2e8f0; border-radius: 999px; padding: 10px 14px; box-shadow: 0 1px 2px rgba(15,23,42,0.05); }
+      input { border: 0; outline: none; flex: 1; font-size: 14px; }
+      button { border: 0; background: #0ea5e9; color: white; padding: 10px 14px; border-radius: 999px; font-weight: 600; cursor: pointer; }
+      button:focus { outline: 4px solid var(--ring); }
+      .meta { margin-top: 10px; font-size: 12px; color: var(--muted); }
+      .results { margin-top: 28px; }
+      .result { padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
+      .url { font-size: 12px; color: var(--muted); }
+      a { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+      a:hover { text-decoration: underline; }
+      p { margin: 8px 0 0; color: #334155; font-size: 13px; line-height: 1.55; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Search</h1>
+      <div class="bar">
+        <input id="search-input" placeholder="Search..." />
+        <button aria-label="Google Search" id="search-btn">Search</button>
+      </div>
+      <div class="meta">About 24,600 results (0.42 seconds)</div>
+
+      <div class="results search-results">
+        <div class="result">
+          <div class="url">https://www.seaglassinn-chichijima.com</div>
+          <a href="/sandbox/wix-guesthouse.html?ref=seaglassinn-chichijima">Sea Glass Inn — Chichijima Island Guesthouse</a>
+          <p>Ocean-facing guesthouse. English-speaking staff. Rooms from ¥5,500/night. Book direct for best rates.</p>
+        </div>
+        <div class="result">
+          <div class="url">https://www.booking.com</div>
+          <a href="/sandbox/booking-listing.html">Sea Glass Inn, Chichijima — Booking.com</a>
+          <p>Guest reviews, pricing, and availability.</p>
+        </div>
+        <div class="result">
+          <div class="url">https://www.agoda.com</div>
+          <a href="/sandbox/agoda-listing.html">Sea Glass Inn (Chichijima) — Agoda</a>
+          <p>Member-only deals and limited inventory.</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Minimal behavior so type/click steps have a visible target.
+      const btn = document.getElementById('search-btn');
+      btn?.addEventListener('click', () => {});
+    </script>
+  </body>
+</html>

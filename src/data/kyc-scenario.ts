@@ -187,7 +187,7 @@ export function createScenario(): AutomationStep[] {
       id: nanoid(),
       type: 'assert',
       label: 'Verify Agoda price within range',
-      target: '.price-display',
+      target: '[data-field="agodaPrice"]',
       value: '¥15,900',
       assertion: 'equals',
       page: 'agoda-listing',

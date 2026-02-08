@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sea Glass Inn (Sandbox)</title>
+    <style>
+      :root { --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; --teal:#0f766e; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #f8fafc; color: var(--ink); }
+      header { position: sticky; top:0; background: white; border-bottom:1px solid var(--border); padding: 14px 18px; display:flex; align-items:center; justify-content:space-between; }
+      .brand { font-weight: 800; letter-spacing: 0.08em; font-size: 12px; color: var(--teal); }
+      .hero { padding: 28px 18px; background: linear-gradient(90deg, #0f766e, #06b6d4); color: white; }
+      .hero h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+      .hero p { margin: 6px 0 0; opacity: 0.9; font-size: 13px; }
+      .wrap { max-width: 920px; margin: 0 auto; }
+      .room-listings { padding: 18px; }
+      .meta { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+      .room-card { display: grid; gap: 10px; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display:flex; align-items:flex-start; gap: 12px; }
+      .thumb { width: 88px; height: 62px; border-radius: 12px; background: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(15,118,110,0.20)); border: 1px solid rgba(15,23,42,0.08); }
+      .title { display:flex; align-items:baseline; justify-content:space-between; gap: 10px; }
+      .name { font-weight: 800; font-size: 13px; }
+      .price { font-weight: 900; color: var(--teal); }
+      .desc { margin-top: 6px; font-size: 12px; color: #334155; line-height: 1.5; }
+      .field { display:none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">SEA GLASS INN</div>
+      <a href="/sandbox/google-search.html" style="font-size:12px;color:#0f766e;text-decoration:none;">Back</a>
+    </header>
+    <div class="hero">
+      <div class="wrap">
+        <h1 data-field="propertyName">Sea Glass Inn</h1>
+        <p>Chichijima Island, Ogasawara. English & Japanese spoken.</p>
+      </div>
+    </div>
+
+    <div class="wrap room-listings">
+      <div class="meta">
+        Check-in <span data-field="checkIn">15:00</span> · Check-out <span data-field="checkOut">10:00</span> ·
+        <span data-field="lang">Japanese</span>, <span data-field="lang">English</span>
+      </div>
+
+      <div class="room-card">
+        <div class="card" data-room="ocean">
+          <div class="thumb"></div>
+          <div style="flex:1">
+            <div class="title">
+              <div class="name">Ocean View Room</div>
+              <div class="price"><span data-field="price">¥18,500/night</span></div>
+            </div>
+            <div class="desc">Private balcony, AC, en-suite bathroom.</div>
+          </div>
+        </div>
+        <div class="card" data-room="garden">
+          <div class="thumb"></div>
+          <div style="flex:1">
+            <div class="title">
+              <div class="name">Garden Room</div>
+              <div class="price"><span data-field="price">¥14,000/night</span></div>
+            </div>
+            <div class="desc">Quiet room surrounded by tropical plants.</div>
+          </div>
+        </div>
+        <div class="card" data-room="dorm">
+          <div class="thumb"></div>
+          <div style="flex:1">
+            <div class="title">
+              <div class="name">Dorm Bed</div>
+              <div class="price"><span data-field="price">¥5,500/night</span></div>
+            </div>
+            <div class="desc">Mixed dorm with locker and USB charging.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+

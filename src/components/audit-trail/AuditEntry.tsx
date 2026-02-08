@@ -51,14 +51,33 @@ export function AuditEntry({ entry }: AuditEntryProps) {
           {entry.message}
         </p>
 
-        {/* Screenshot placeholder */}
+        {/* Screenshot */}
         {entry.screenshotUrl && (
-          <div className="mt-1.5 rounded-lg border border-surface-200 bg-surface-50 p-2">
-            <div className="flex items-center gap-1.5 text-[10px] text-surface-500">
-              <div className="w-3 h-3 bg-pink-100 rounded flex items-center justify-center">
-                <span className="text-[8px]">📸</span>
-              </div>
-              Screenshot captured
+          <div className="mt-1.5">
+            <a
+              href={entry.screenshotUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-lg overflow-hidden border border-surface-200 bg-surface-50 hover:border-surface-300 transition-colors"
+              title="Open screenshot in new tab"
+            >
+              <img
+                src={entry.screenshotUrl}
+                alt="Run screenshot"
+                loading="lazy"
+                className="w-full h-auto block"
+              />
+            </a>
+            <div className="mt-1 flex items-center justify-between text-[10px] text-surface-500">
+              <span>Screenshot</span>
+              <a
+                href={entry.screenshotUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-forge-700 hover:underline"
+              >
+                Open
+              </a>
             </div>
           </div>
         )}
