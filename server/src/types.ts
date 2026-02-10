@@ -7,7 +7,24 @@ export type StepType =
   | 'assert'
   | 'wait'
   | 'scroll'
-  | 'select';
+  | 'select'
+  | 'api';
+
+export type ApiService = 'ghl';
+
+export interface ApiStep {
+  service: ApiService;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  query?: Record<string, string | number | boolean | null>;
+  body?: unknown;
+  timeoutMs?: number;
+  /**
+   * If true (default), runner will add `locationId` to query/body when missing
+   * and the integration has a location selected.
+   */
+  injectLocationId?: boolean;
+}
 
 export interface AutomationStep {
   id: string;
@@ -20,6 +37,9 @@ export interface AutomationStep {
   page?: string;
   duration?: number;
   extractedData?: Record<string, unknown>;
+  api?: ApiStep;
+  /** Map varName -> JSON pointer(s) extracted from last API response. */
+  save?: Record<string, string | string[]>;
 }
 
 export type Severity = 'info' | 'success' | 'warning' | 'error';
@@ -55,4 +75,3 @@ export type RunEvent =
   | { type: 'ui'; runId: string; ts: number; action: { kind: 'typing'; target: string; text: string } }
   | { type: 'ui'; runId: string; ts: number; action: { kind: 'flash'; show: boolean } }
   | { type: 'ui'; runId: string; ts: number; action: { kind: 'scanline'; show: boolean } };
-

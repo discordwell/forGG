@@ -11,34 +11,41 @@ import type {
   ExecutionState,
   StepStatus,
 } from '../types/automation';
-import { createScenario } from '../data/kyc-scenario';
+import { DEFAULT_SCENARIO_ID, SCENARIO_BY_ID, type ScenarioId } from '../data/scenarios';
 
 export interface AutomationState {
+  scenarioId: ScenarioId;
   steps: AutomationStep[];
   execution: ExecutionState;
 }
 
-const initialSteps = createScenario();
+function createInitialExecution(steps: AutomationStep[], currentPage: string): ExecutionState {
+  return {
+    status: 'idle',
+    currentStepIndex: -1,
+    stepStatuses: steps.map(() => 'pending' as StepStatus),
+    auditLog: [],
+    startTime: null,
+    endTime: null,
+    speed: 1,
+    currentPage,
+    cursorPosition: { x: 400, y: 300 },
+    activeHighlight: null,
+    showFlash: false,
+    showRipple: null,
+    showScanline: false,
+    typingText: '',
+    typingTarget: '',
+  };
+}
 
-const initialExecution: ExecutionState = {
-  status: 'idle',
-  currentStepIndex: -1,
-  stepStatuses: initialSteps.map(() => 'pending' as StepStatus),
-  auditLog: [],
-  startTime: null,
-  endTime: null,
-  speed: 1,
-  currentPage: 'google-search',
-  cursorPosition: { x: 400, y: 300 },
-  activeHighlight: null,
-  showFlash: false,
-  showRipple: null,
-  showScanline: false,
-  typingText: '',
-  typingTarget: '',
-};
+const initialScenarioId: ScenarioId = DEFAULT_SCENARIO_ID;
+const initialScenario = SCENARIO_BY_ID[initialScenarioId];
+const initialSteps = initialScenario.create();
+const initialExecution = createInitialExecution(initialSteps, initialScenario.defaultPage);
 
 const initialState: AutomationState = {
+  scenarioId: initialScenarioId,
   steps: initialSteps,
   execution: initialExecution,
 };
@@ -48,6 +55,19 @@ function automationReducer(
   action: AutomationAction
 ): AutomationState {
   switch (action.type) {
+    case 'SET_SCENARIO': {
+      const scenario = SCENARIO_BY_ID[action.scenarioId];
+      const steps = scenario.create();
+      return {
+        scenarioId: action.scenarioId,
+        steps,
+        execution: {
+          ...createInitialExecution(steps, scenario.defaultPage),
+          speed: state.execution.speed,
+        },
+      };
+    }
+
     case 'SET_STEPS':
       return {
         ...state,
@@ -106,13 +126,19 @@ function automationReducer(
       return {
         ...state,
         execution: {
-          ...initialExecution,
+          ...createInitialExecution(
+            state.steps,
+            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'google-search'
+          ),
           speed: state.execution.speed,
           status: 'running',
           currentStepIndex: 0,
           stepStatuses: state.steps.map(() => 'pending'),
           startTime: new Date(),
-          currentPage: state.steps[0]?.page || 'google-search',
+          currentPage:
+            state.steps[0]?.page ||
+            SCENARIO_BY_ID[state.scenarioId]?.defaultPage ||
+            'google-search',
         },
       };
 
@@ -256,7 +282,10 @@ function automationReducer(
       return {
         ...state,
         execution: {
-          ...initialExecution,
+          ...createInitialExecution(
+            state.steps,
+            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'google-search'
+          ),
           speed: state.execution.speed,
           stepStatuses: state.steps.map(() => 'pending'),
         },

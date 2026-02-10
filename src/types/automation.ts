@@ -7,7 +7,20 @@ export type StepType =
   | 'assert'
   | 'wait'
   | 'scroll'
-  | 'select';
+  | 'select'
+  | 'api';
+
+export type ApiService = 'ghl';
+
+export interface ApiStep {
+  service: ApiService;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  query?: Record<string, string | number | boolean | null>;
+  body?: unknown;
+  timeoutMs?: number;
+  injectLocationId?: boolean;
+}
 
 export type StepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
 
@@ -28,6 +41,8 @@ export interface AutomationStep {
   duration?: number;
   /** Data to "extract" for extract steps */
   extractedData?: Record<string, unknown>;
+  api?: ApiStep;
+  save?: Record<string, string | string[]>;
 }
 
 export interface AuditLogEntry {
@@ -63,7 +78,10 @@ export interface ExecutionState {
   typingTarget: string;
 }
 
+import type { ScenarioId } from '../data/scenarios';
+
 export type AutomationAction =
+  | { type: 'SET_SCENARIO'; scenarioId: ScenarioId }
   | { type: 'SET_STEPS'; steps: AutomationStep[] }
   | { type: 'ADD_STEP'; step: AutomationStep }
   | { type: 'UPDATE_STEP'; id: string; updates: Partial<AutomationStep> }

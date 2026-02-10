@@ -3,10 +3,19 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import fs from 'node:fs';
 import { nanoid } from 'nanoid';
+import { z } from 'zod';
 import { openDb } from './db';
 import { RunSseHub } from './sse';
 import { Runner } from './runner';
 import { CreateRunSchema } from './validate';
+import { ghlBridgePage } from './ghl/bridgePage';
+import {
+  clearGhlIntegration,
+  getGhlIntegration,
+  redactGhlIntegration,
+  setGhlIntegration,
+} from './ghl/integration';
+import { GhlClient } from './ghl/client';
 
 const PORT = Number(process.env.PORT ?? '8787');
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -31,6 +40,84 @@ const runner = new Runner(db, hub, { artifactsDir, origin: originForHost(HOST, P
 const app = Fastify({ logger: false });
 
 app.get('/healthz', async () => ({ ok: true }));
+
+const ALLOWED_GHL_ORIGINS = new Set(['https://app.gohighlevel.com', 'https://app.leadconnectorhq.com']);
+
+// ---------------------------------------------------------------------------
+// Integrations: GoHighLevel (GHL)
+// ---------------------------------------------------------------------------
+
+app.get('/api/integrations/ghl/status', async () => {
+  return redactGhlIntegration(getGhlIntegration(db));
+});
+
+app.get('/api/integrations/ghl/bridge', async (req, reply) => {
+  const host = req.headers.host || `127.0.0.1:${PORT}`;
+  const postUrl = `http://${host}/api/integrations/ghl/token`;
+  reply.header('Content-Type', 'text/html; charset=utf-8');
+  return reply.send(ghlBridgePage({ postUrl }));
+});
+
+app.options('/api/integrations/ghl/token', async (req, reply) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_GHL_ORIGINS.has(origin)) reply.header('Access-Control-Allow-Origin', origin);
+  reply.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  reply.header('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Request-Private-Network');
+  // Private Network Access (Chrome): allow https://app.gohighlevel.com -> http://localhost
+  reply.header('Access-Control-Allow-Private-Network', 'true');
+  return reply.code(204).send();
+});
+
+app.post('/api/integrations/ghl/token', async (req, reply) => {
+  const TokenSchema = z.object({
+    authToken: z.string().min(1),
+    companyId: z.string().optional(),
+    userId: z.string().optional(),
+    locationId: z.string().optional(),
+  });
+  const parsed = TokenSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: 'invalid_request', issues: parsed.error.issues });
+  }
+
+  const { authToken, companyId, userId, locationId } = parsed.data;
+  setGhlIntegration(db, {
+    accessToken: authToken,
+    companyId: companyId || undefined,
+    userId: userId || undefined,
+    locationId: locationId || undefined,
+    capturedAt: Date.now(),
+  });
+
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_GHL_ORIGINS.has(origin)) reply.header('Access-Control-Allow-Origin', origin);
+  reply.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  reply.header('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Request-Private-Network');
+  reply.header('Access-Control-Allow-Private-Network', 'true');
+  return reply.send({ ok: true });
+});
+
+app.get('/api/integrations/ghl/locations', async (_req, reply) => {
+  const integration = getGhlIntegration(db);
+  if (!integration?.companyId) return reply.code(400).send({ error: 'missing_company_id' });
+  const ghl = new GhlClient(integration);
+  const res = await ghl.request({ method: 'GET', path: '/locations/search', query: { companyId: integration.companyId } });
+  return res.data;
+});
+
+app.post('/api/integrations/ghl/location', async (req, reply) => {
+  const parsed = z.object({ locationId: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return reply.code(400).send({ error: 'invalid_request', issues: parsed.error.issues });
+  const integration = getGhlIntegration(db);
+  if (!integration) return reply.code(400).send({ error: 'not_connected' });
+  setGhlIntegration(db, { ...integration, locationId: parsed.data.locationId });
+  return reply.send({ ok: true });
+});
+
+app.delete('/api/integrations/ghl', async (_req, reply) => {
+  clearGhlIntegration(db);
+  return reply.send({ ok: true });
+});
 
 app.register(fastifyStatic, {
   root: artifactsDir,

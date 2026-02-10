@@ -4,6 +4,7 @@ import {
   MousePointer2,
   Keyboard,
   Database,
+  Server,
   Camera,
   CheckCircle2,
   Clock,
@@ -114,6 +115,18 @@ export const STEP_TYPE_META: Record<StepType, StepTypeMeta> = {
     hasTarget: true,
     hasValue: true,
   },
+  api: {
+    type: 'api',
+    label: 'API Call',
+    icon: Server,
+    color: 'text-teal-700',
+    bgColor: 'bg-teal-50',
+    description: 'Call an external API (ex: GoHighLevel)',
+    hasTarget: false,
+    hasValue: false,
+  },
 };
 
-export const STEP_TYPES_LIST = Object.values(STEP_TYPE_META);
+// The step builder UI can add basic browser steps; API steps are typically authored as part of
+// prebuilt workflows (until we add a proper request editor).
+export const STEP_TYPES_LIST = Object.values(STEP_TYPE_META).filter((m) => m.type !== 'api');

@@ -30,6 +30,9 @@ export interface Db {
   listEvents: (runId: string) => DbEvent[];
   listRuns: (limit: number) => DbRun[];
   getRun: (runId: string) => DbRun | null;
+  getKv: (key: string) => string | null;
+  setKv: (key: string, valueJson: string) => void;
+  deleteKv: (key: string) => void;
 }
 
 export function openDb(opts?: { dataDir?: string }) : Db {
@@ -59,6 +62,12 @@ export function openDb(opts?: { dataDir?: string }) : Db {
       FOREIGN KEY (run_id) REFERENCES runs (id)
     );
     CREATE INDEX IF NOT EXISTS idx_events_run_id ON events (run_id, id);
+
+    CREATE TABLE IF NOT EXISTS kv (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   const createRunStmt = raw.prepare(`
@@ -115,6 +124,24 @@ export function openDb(opts?: { dataDir?: string }) : Db {
     LIMIT ?
   `);
 
+  const getKvStmt = raw.prepare(`
+    SELECT value_json as valueJson
+    FROM kv
+    WHERE key = ?
+  `);
+
+  const setKvStmt = raw.prepare(`
+    INSERT INTO kv (key, value_json, updated_at)
+    VALUES (@key, @valueJson, @updatedAt)
+    ON CONFLICT(key) DO UPDATE SET
+      value_json = excluded.value_json,
+      updated_at = excluded.updated_at
+  `);
+
+  const deleteKvStmt = raw.prepare(`
+    DELETE FROM kv WHERE key = ?
+  `);
+
   return {
     raw,
     createRun: ({ id, stepsJson }) => createRunStmt.run({ id, createdAt: Date.now(), status: 'queued', stepsJson }),
@@ -128,5 +155,15 @@ export function openDb(opts?: { dataDir?: string }) : Db {
     listEvents: (runId) => listEventsStmt.all(runId) as DbEvent[],
     listRuns: (limit) => listRunsStmt.all(Math.max(1, Math.min(limit, 200))) as DbRun[],
     getRun: (runId) => (getRunStmt.get(runId) as DbRun | undefined) ?? null,
+    getKv: (key) => {
+      const row = getKvStmt.get(key) as { valueJson?: string } | undefined;
+      return row?.valueJson ?? null;
+    },
+    setKv: (key, valueJson) => {
+      setKvStmt.run({ key, valueJson, updatedAt: Date.now() });
+    },
+    deleteKv: (key) => {
+      deleteKvStmt.run(key);
+    },
   };
 }

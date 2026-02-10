@@ -4,6 +4,7 @@ import { WixGuesthousePage } from '../../pages/WixGuesthousePage';
 import { BookingListingPage } from '../../pages/BookingListingPage';
 import { AgodaListingPage } from '../../pages/AgodaListingPage';
 import { ResearchTrackerPage } from '../../pages/ResearchTrackerPage';
+import { MaxLevelOpsPage } from '../../pages/MaxLevelOpsPage';
 import { SimulatedCursor } from './SimulatedCursor';
 import { HighlightOverlay } from './HighlightOverlay';
 
@@ -13,6 +14,7 @@ const PAGE_COMPONENTS: Record<string, React.FC> = {
   'booking-listing': BookingListingPage,
   'agoda-listing': AgodaListingPage,
   'research-tracker': ResearchTrackerPage,
+  'maxlevel-ops': MaxLevelOpsPage,
 };
 
 export function BrowserViewport() {
