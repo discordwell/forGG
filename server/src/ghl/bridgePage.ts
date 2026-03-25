@@ -13,16 +13,20 @@ export function ghlBridgePage(opts: { postUrl: string }) {
     "var st=vue.config&&vue.config.globalProperties&&vue.config.globalProperties.$store&&vue.config.globalProperties.$store.state;" +
     "if(!st){alert('No store state found. Are you logged in?');return;}" +
     "var u=(st.auth&&st.auth.user)||{};" +
-    "var authToken=u.authToken||'';" +
-    "if(!authToken){alert('No authToken found. Are you logged in?');return;}" +
+    // Prefer `jwt` (used by many core endpoints). Fallback to `authToken` for older sessions.
+    "var authToken=(u.jwt||u.authToken||'');" +
+    "if(!authToken){alert('No auth token found. Are you logged in?');return;}" +
+    // Firebase ID token used as `token-id` for some endpoints.
+    "var tokenId=(u.firebaseToken||'');" +
     // Best-effort location id discovery.
-    "var locationId=u.locationId||" +
+    "var locationId=(st.auth&&st.auth.locationId)||u.locationId||" +
     "(st.location&&st.location.locationId)||" +
     "(st.location&&st.location.id)||" +
     "(st.locations&&st.locations.selectedLocationId)||" +
     "(st.selectedLocationId)||" +
     "'';" +
-    "var d={authToken:authToken,companyId:u.companyId||'',userId:u.id||'',locationId:locationId||''};" +
+    "var userId=(u.userId||u.id||'');" +
+    "var d={authToken:authToken,tokenId:tokenId||'',companyId:u.companyId||'',userId:userId||'',locationId:locationId||''};" +
     "fetch('" + postUrl + "',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})" +
     ".then(function(r){if(r.ok)alert('Token captured! You can close this tab.'); else r.text().then(function(t){alert('Error: '+t)})})" +
     ".catch(function(e){alert('Could not reach bridge server: '+e);});" +
@@ -173,4 +177,3 @@ export function ghlBridgePage(opts: { postUrl: string }) {
   </body>
 </html>`;
 }
-

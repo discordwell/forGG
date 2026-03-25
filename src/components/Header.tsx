@@ -107,24 +107,30 @@ export function Header() {
             </span>
           </div>
           <div className="mt-0.5">
-            <select
-              value={scenarioId}
-              disabled={isRunning}
-              onChange={(e) =>
-                dispatch({
-                  type: 'SET_SCENARIO',
-                  scenarioId: e.target.value as ScenarioId,
-                })
-              }
-              className="text-[10px] text-surface-600 bg-transparent border border-surface-200 rounded px-1.5 py-0.5 max-w-[280px] disabled:opacity-50 disabled:cursor-not-allowed"
-              title={scenario.description}
-            >
-              {SCENARIOS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            {SCENARIOS.length > 1 ? (
+              <select
+                value={scenarioId}
+                disabled={isRunning}
+                onChange={(e) =>
+                  dispatch({
+                    type: 'SET_SCENARIO',
+                    scenarioId: e.target.value as ScenarioId,
+                  })
+                }
+                className="text-[10px] text-surface-600 bg-transparent border border-surface-200 rounded px-1.5 py-0.5 max-w-[280px] disabled:opacity-50 disabled:cursor-not-allowed"
+                title={scenario.description}
+              >
+                {SCENARIOS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[10px] text-surface-600" title={scenario.description}>
+                {scenario.name}
+              </span>
+            )}
           </div>
         </div>
       </div>

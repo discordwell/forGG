@@ -71,6 +71,7 @@ app.options('/api/integrations/ghl/token', async (req, reply) => {
 app.post('/api/integrations/ghl/token', async (req, reply) => {
   const TokenSchema = z.object({
     authToken: z.string().min(1),
+    tokenId: z.string().optional(),
     companyId: z.string().optional(),
     userId: z.string().optional(),
     locationId: z.string().optional(),
@@ -80,9 +81,10 @@ app.post('/api/integrations/ghl/token', async (req, reply) => {
     return reply.code(400).send({ error: 'invalid_request', issues: parsed.error.issues });
   }
 
-  const { authToken, companyId, userId, locationId } = parsed.data;
+  const { authToken, tokenId, companyId, userId, locationId } = parsed.data;
   setGhlIntegration(db, {
     accessToken: authToken,
+    tokenId: tokenId || undefined,
     companyId: companyId || undefined,
     userId: userId || undefined,
     locationId: locationId || undefined,

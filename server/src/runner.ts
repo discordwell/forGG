@@ -17,7 +17,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 function sandboxPathForPageKey(pageKey: string | undefined): string {
-  if (!pageKey) return '/sandbox/google-search.html';
+  if (!pageKey) return '/sandbox/blank.html';
   return `/sandbox/${pageKey}.html`;
 }
 
@@ -65,75 +65,6 @@ async function maybeScrollToTarget(page: Page, step: AutomationStep) {
 }
 
 async function extractForStep(page: Page, step: AutomationStep): Promise<Record<string, unknown>> {
-  // Structured extraction for our sandbox pages. If a step contains extractedData,
-  // we still prefer live extraction to keep the backend "real".
-  const key = step.page ?? '';
-  if (key === 'wix-guesthouse') {
-    return await page.evaluate(() => {
-      const txt = (sel: string) => document.querySelector(sel)?.textContent?.trim() ?? '';
-      return {
-        propertyName: txt('[data-field="propertyName"]'),
-        oceanViewRoom: txt('[data-room="ocean"] [data-field="price"]'),
-        gardenRoom: txt('[data-room="garden"] [data-field="price"]'),
-        dormBed: txt('[data-room="dorm"] [data-field="price"]'),
-        checkInTime: txt('[data-field="checkIn"]'),
-        checkOutTime: txt('[data-field="checkOut"]'),
-        languages: Array.from(document.querySelectorAll('[data-field="lang"]')).map((n) => n.textContent?.trim()).filter(Boolean),
-      };
-    });
-  }
-
-  if (key === 'booking-listing') {
-    return await page.evaluate(() => {
-      const txt = (sel: string) => document.querySelector(sel)?.textContent?.trim() ?? '';
-      const num = (sel: string) => {
-        const t = txt(sel).replace(/[^0-9.]/g, '');
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      };
-      const int = (sel: string) => {
-        const t = txt(sel).replace(/[^0-9]/g, '');
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      };
-      return {
-        propertyName: txt('[data-field="propertyName"]'),
-        rating: num('[data-field="rating"]'),
-        reviewCount: int('[data-field="reviewCount"]'),
-        pricePerNight: txt('[data-field="pricePerNight"]'),
-        location: txt('[data-field="location"]'),
-        freeCancel: txt('[data-field="freeCancel"]') === 'true',
-        breakfastIncluded: txt('[data-field="breakfastIncluded"]') === 'true',
-        lastBooked: txt('[data-field="lastBooked"]'),
-      };
-    });
-  }
-
-  if (key === 'agoda-listing') {
-    return await page.evaluate(() => {
-      const txt = (sel: string) => document.querySelector(sel)?.textContent?.trim() ?? '';
-      const num = (sel: string) => {
-        const t = txt(sel).replace(/[^0-9.]/g, '');
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      };
-      const int = (sel: string) => {
-        const t = txt(sel).replace(/[^0-9]/g, '');
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      };
-      return {
-        propertyName: txt('[data-field="propertyName"]'),
-        agodaRating: num('[data-field="agodaRating"]'),
-        agodaPrice: txt('[data-field="agodaPrice"]'),
-        discountPercent: txt('[data-field="discountPercent"]'),
-        memberDeal: txt('[data-field="memberDeal"]') === 'true',
-        roomsLeft: int('[data-field="roomsLeft"]'),
-        includesTax: txt('[data-field="includesTax"]') === 'true',
-      };
-    });
-  }
-
   // Fallback: dump text for target selector.
   if (step.target) {
     const text = await page.locator(step.target).first().textContent().catch(() => null);
@@ -153,7 +84,7 @@ function getVar(vars: Record<string, unknown>, key: string): unknown {
 }
 
 function interpolateString(template: string, vars: Record<string, unknown>): string {
-  return template.replace(/{{\\s*([a-zA-Z0-9_.-]+)\\s*}}/g, (_m, key) => {
+  return template.replace(/{{\s*([a-zA-Z0-9_.-]+)\s*}}/g, (_m, key) => {
     const v = getVar(vars, key);
     if (v === undefined || v === null) return '';
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);

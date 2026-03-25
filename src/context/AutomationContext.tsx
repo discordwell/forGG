@@ -128,7 +128,7 @@ function automationReducer(
         execution: {
           ...createInitialExecution(
             state.steps,
-            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'google-search'
+            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'maxlevel-ops'
           ),
           speed: state.execution.speed,
           status: 'running',
@@ -138,7 +138,7 @@ function automationReducer(
           currentPage:
             state.steps[0]?.page ||
             SCENARIO_BY_ID[state.scenarioId]?.defaultPage ||
-            'google-search',
+            'maxlevel-ops',
         },
       };
 
@@ -284,7 +284,7 @@ function automationReducer(
         execution: {
           ...createInitialExecution(
             state.steps,
-            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'google-search'
+            SCENARIO_BY_ID[state.scenarioId]?.defaultPage || 'maxlevel-ops'
           ),
           speed: state.execution.speed,
           stepStatuses: state.steps.map(() => 'pending'),

@@ -22,6 +22,21 @@ const REQUIRED_HEADERS: Record<string, string> = {
   source: 'WEB_USER',
 };
 
+// Some endpoints reject requests unless they resemble the web app.
+// Values based on captured browser traffic; these are best-effort defaults.
+const BROWSERISH_HEADERS: Record<string, string> = {
+  'app-name': 'spm-ts',
+  'route-name': 'agency_launchpad',
+  'route-path': 'https://app.gohighlevel.com/agency_launchpad',
+  'x-translations-lang': 'en-US',
+  Referer: 'https://app.gohighlevel.com/',
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+  'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+  'sec-ch-ua-platform': '"macOS"',
+  'sec-ch-ua-mobile': '?0',
+};
+
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
@@ -64,7 +79,13 @@ export class GhlClient {
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       ...REQUIRED_HEADERS,
+      ...BROWSERISH_HEADERS,
     };
+
+    // Some core endpoints require the Firebase ID token as `token-id`.
+    if (this.integration.tokenId) {
+      headers['token-id'] = this.integration.tokenId;
+    }
 
     let attempt = 0;
     let lastErr: unknown = null;
