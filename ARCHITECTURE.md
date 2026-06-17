@@ -53,6 +53,9 @@ server events streamed over SSE.
 - **`src/db.ts`** — better-sqlite3 (WAL). Tables: `runs`, `events`
   (append-only log, FK to runs, enforced), `kv` (integration store).
 - **`src/sse.ts`** — `RunSseHub`, a per-run set of connected SSE clients.
+  `broadcast` is self-healing: a client whose socket is `destroyed` (the
+  reliable dead-socket signal — `write()` returns false, it does not throw) is
+  pruned so it can't wedge delivery to the rest of the run's clients.
 - **`src/ghl/`** — GoHighLevel integration:
   - `client.ts` — `GhlClient.request()` against
     `backend.leadconnectorhq.com` with browser-like headers. Retry policy:
@@ -109,11 +112,13 @@ lead-intake workflow).
 
 - **Server:** pure helpers (`template`, and `steps` — the `wait` parsing and
   the assert-step `equals`/`contains`/`greaterThan` evaluation), the SQLite
-  layer, zod schemas, `GhlClient` retry behavior (mocked `fetch`), HTTP routes
-  (`app.inject()` with a fake runner) plus the SSE `/events` route against a
-  live server (history replays, then live broadcasts stream, in order, with no
-  duplication), and real `Runner` lifecycle tests using wait-only steps (no
-  browser needed).
+  layer (incl. `listRuns` flooring/clamping a non-integer limit), zod schemas,
+  `GhlClient` retry behavior (mocked `fetch`), the `RunSseHub` fan-out (per-run
+  delivery, the SSE wire format, last-client teardown, dead-client pruning) with
+  recording fakes, HTTP routes (`app.inject()` with a fake runner) plus the SSE
+  `/events` route against a live server (history replays, then live broadcasts
+  stream, in order, with no duplication), and real `Runner` lifecycle tests
+  using wait-only steps (no browser needed).
 - **Frontend:** the full `automationReducer` action surface, and the
   `RunController` lifecycle (incl. the regression where stopping a run wedged
   the next "Execute") plus `eventToActions`/`isTerminalEvent` — all with fakes,

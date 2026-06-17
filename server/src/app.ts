@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import type { Db } from './db';
+import { DEFAULT_RUN_LIMIT, type Db } from './db';
 import type { RunSseHub } from './sse';
 import type { AutomationStep } from './types';
 import { CreateRunSchema } from './validate';
@@ -187,8 +187,9 @@ export function buildApp(opts: BuildAppOpts): FastifyInstance {
 
   app.get('/api/runs', async (req) => {
     const limitRaw = (req.query as { limit?: string }).limit;
-    const limit = limitRaw ? Number(limitRaw) : 25;
-    return db.listRuns(Number.isFinite(limit) ? limit : 25);
+    // `db.listRuns` floors, clamps, and defaults a non-finite value, so any
+    // query string (e.g. ?limit=2.5 or ?limit=abc) is safe to forward.
+    return db.listRuns(limitRaw ? Number(limitRaw) : DEFAULT_RUN_LIMIT);
   });
 
   app.get('/api/runs/:runId', async (req, reply) => {

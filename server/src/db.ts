@@ -2,6 +2,11 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
 
+/** Default `listRuns` page size when no (or a non-numeric) limit is given. */
+export const DEFAULT_RUN_LIMIT = 25;
+/** Hard cap on `listRuns` page size, regardless of the requested limit. */
+const MAX_RUN_LIMIT = 200;
+
 export type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'aborted';
 
 export interface DbRun {
@@ -153,7 +158,13 @@ export function openDb(opts?: { dataDir?: string }) : Db {
       return Number(res.lastInsertRowid);
     },
     listEvents: (runId) => listEventsStmt.all(runId) as DbEvent[],
-    listRuns: (limit) => listRunsStmt.all(Math.max(1, Math.min(limit, 200))) as DbRun[],
+    listRuns: (limit) => {
+      // SQLite's LIMIT must bind an integer — a non-integer (or NaN) throws a
+      // "datatype mismatch", so floor and clamp before binding; a non-finite
+      // limit falls back to the default page size.
+      const n = Number.isFinite(limit) ? Math.floor(limit) : DEFAULT_RUN_LIMIT;
+      return listRunsStmt.all(Math.max(1, Math.min(n, MAX_RUN_LIMIT))) as DbRun[];
+    },
     getRun: (runId) => (getRunStmt.get(runId) as DbRun | undefined) ?? null,
     getKv: (key) => {
       const row = getKvStmt.get(key) as { valueJson?: string } | undefined;

@@ -120,6 +120,17 @@ test('run detail, listing and events.json', async () => {
     assert.equal(list.statusCode, 200);
     assert.equal(list.json().length, 1);
 
+    // A non-integer limit must not 500 (it would crash SQLite's LIMIT binding
+    // with a "datatype mismatch" before the floor was added).
+    const floatLimit = await ctx.app.inject({ method: 'GET', url: '/api/runs?limit=2.5' });
+    assert.equal(floatLimit.statusCode, 200);
+    assert.equal(floatLimit.json().length, 1);
+
+    // A non-numeric limit falls back to the default rather than erroring.
+    const junkLimit = await ctx.app.inject({ method: 'GET', url: '/api/runs?limit=abc' });
+    assert.equal(junkLimit.statusCode, 200);
+    assert.equal(junkLimit.json().length, 1);
+
     ctx.db.addEvent({ runId, ts: 1, type: 'run_started', payloadJson: '{"type":"run_started"}' });
     const events = await ctx.app.inject({ method: 'GET', url: `/api/runs/${runId}/events.json` });
     assert.equal(events.statusCode, 200);

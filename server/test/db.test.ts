@@ -59,7 +59,12 @@ test('listRuns respects and clamps the limit', () =>
     for (let i = 0; i < 5; i++) db.createRun({ id: `r${i}`, stepsJson: '[]' });
     assert.equal(db.listRuns(3).length, 3);
     assert.equal(db.listRuns(0).length, 1); // clamped to >= 1
+    assert.equal(db.listRuns(-10).length, 1); // negatives clamp to >= 1
     assert.equal(db.listRuns(500).length, 5); // upper clamp of 200 still returns all rows
+    // A non-integer LIMIT used to reach SQLite verbatim and throw a "datatype
+    // mismatch"; it must now floor (2.9 -> 2) instead of throwing.
+    assert.equal(db.listRuns(2.9).length, 2);
+    assert.equal(db.listRuns(Number.NaN).length, 5); // non-finite falls back to the 25 default -> all 5 rows
   }));
 
 test('addEvent and listEvents preserve insertion order', () =>

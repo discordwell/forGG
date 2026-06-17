@@ -2,6 +2,32 @@
 
 ## Session Summaries
 
+### 2026-06-17 ~20:26 UTC — listRuns non-integer-limit 500 fix; SSE hub tests + correct dead-client pruning
+- Landed the prior WIP first (steps.ts extraction + greaterThan fix + SSE route
+  test) as its own commit, and removed a stray root-level `leak_probe.test.ts`
+  debug file (always asserted true; not in any test/tsconfig glob).
+- **Bug fixed (with regression tests):** `GET /api/runs?limit=<non-integer>`
+  returned 500. `db.listRuns` clamped but never floored, so a float `LIMIT`
+  (e.g. `2.5`) reached SQLite and threw `datatype mismatch`. Confirmed via a
+  raw better-sqlite3 probe (float/NaN LIMIT throws; negatives/0 were already
+  absorbed by the clamp). Fix: `listRuns` now `Math.floor`s and falls back to
+  the default page size for a non-finite value. Extracted `DEFAULT_RUN_LIMIT`
+  (25) / `MAX_RUN_LIMIT` (200) constants; the route imports the default and
+  drops its now-redundant `Number.isFinite` re-guard (db owns floor+clamp+NaN).
+- Added `server/test/sse.test.ts` (8 tests) — the first **direct** `RunSseHub`
+  coverage (was only exercised indirectly): SSE wire format, per-run fan-out,
+  Set-dedup, idempotent `remove`, last-client teardown, and dead-client pruning.
+- **SSE robustness (code-review driven):** `broadcast` now self-heals by
+  pruning dead clients — but keyed on `res.destroyed`, NOT a thrown write. A
+  first attempt pruned on a `write()` throw; a runtime probe (Node 25.8.1)
+  proved `write()` on a dead socket returns `false` (no throw), so that catch
+  never fired. `write() === false` alone is unusable (it's also backpressure);
+  `destroyed` is the reliable signal. The `catch` is kept for the rarer
+  write-after-end throw. Dead clients are collected and removed after iterating
+  (no mutate-during-iteration).
+- Verified: typecheck (4 projects), lint, 116/116 tests, full build. A 3-angle
+  code-review subagent pass caught the prune-on-throw no-op before commit.
+
 ### 2026-06-17 ~14:06 UTC — Runner step-logic extraction; greaterThan bug fix; SSE route test
 - Extracted the runner's pure step helpers into `server/src/steps.ts` (mirrors
   `template.ts`/`locations.ts`): `sandboxPathForPageKey`, `severityForStep`,
@@ -76,6 +102,19 @@
   test (healthz/bridge/status/run-create on PORT=18787).
 
 ## Key Findings
+
+- `db.listRuns` binds its argument to a SQLite `LIMIT`, which **requires an
+  integer** — a float or `NaN` throws "datatype mismatch" (negatives/0 are fine,
+  SQLite treats <0 as no-limit but the `Math.max(1, …)` clamp handles that). The
+  query-param route must therefore floor before binding. `DEFAULT_RUN_LIMIT`/
+  `MAX_RUN_LIMIT` live in `server/src/db.ts`; the db owns floor+clamp+NaN-default
+  so the route just forwards `Number(limitRaw)`.
+- Node `ServerResponse.write()` on a **dead/destroyed** socket returns `false`
+  and does **not** throw (verified on Node 25.8.1); it only throws for things
+  like write-after-end. So to reap dead SSE clients in `RunSseHub.broadcast`,
+  check `res.destroyed` — never treat `write() === false` as dead (that is also
+  normal backpressure on a healthy client). The route's `req.raw.on('close')`
+  handler is still the primary reaper; broadcast pruning is belt-and-suspenders.
 
 - Assert-step semantics live in `server/src/steps.ts::evaluateAssertion`
   (`equals` default, `contains`, `greaterThan`). The `assertion` field is only
