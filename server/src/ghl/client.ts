@@ -5,12 +5,24 @@ export class GhlHttpError extends Error {
   readonly url: string;
   readonly bodyText: string;
 
-  constructor(args: { status: number; url: string; bodyText: string }) {
+  constructor(args: { status: number; url: string; bodyText: string }, message?: string) {
     const snippet = (args.bodyText || '').trim().slice(0, 600);
-    super(`GHL request failed (${args.status})${snippet ? `: ${snippet}` : ''}`);
+    super(message ?? `GHL request failed (${args.status})${snippet ? `: ${snippet}` : ''}`);
     this.status = args.status;
     this.url = args.url;
     this.bodyText = args.bodyText;
+  }
+}
+
+/**
+ * A 2xx response whose body could not be parsed as JSON. Never retried: for
+ * POST/PUT the server-side effect already happened, so retrying would
+ * duplicate it. Subclasses GhlHttpError so generic handlers cover it.
+ */
+export class GhlParseError extends GhlHttpError {
+  constructor(args: { status: number; url: string; bodyText: string }) {
+    const snippet = (args.bodyText || '').trim().slice(0, 200);
+    super(args, `GHL returned non-JSON response (${args.status})${snippet ? `: ${snippet}` : ''}`);
   }
 }
 
@@ -64,8 +76,24 @@ export interface GhlRequestArgs {
   timeoutMs?: number;
 }
 
+export interface GhlClientOpts {
+  maxAttempts?: number;
+  baseDelayMs?: number;
+}
+
+const MAX_RETRY_AFTER_MS = 15_000;
+
 export class GhlClient {
-  constructor(private readonly integration: GhlIntegration) {}
+  private readonly maxAttempts: number;
+  private readonly baseDelayMs: number;
+
+  constructor(
+    private readonly integration: GhlIntegration,
+    opts?: GhlClientOpts
+  ) {
+    this.maxAttempts = Math.max(1, opts?.maxAttempts ?? 5);
+    this.baseDelayMs = Math.max(1, opts?.baseDelayMs ?? 250);
+  }
 
   async request<T = unknown>(args: GhlRequestArgs): Promise<{ status: number; data: T; url: string }> {
     const url = new URL(args.path.startsWith('/') ? `${BASE_URL}${args.path}` : `${BASE_URL}/${args.path}`);
@@ -89,7 +117,7 @@ export class GhlClient {
 
     let attempt = 0;
     let lastErr: unknown = null;
-    const maxAttempts = 5;
+    const maxAttempts = this.maxAttempts;
     while (attempt < maxAttempts) {
       attempt += 1;
       const controller = new AbortController();
@@ -106,23 +134,43 @@ export class GhlClient {
         const text = await res.text().catch(() => '');
         if (!res.ok) {
           if (isRetryableStatus(res.status)) {
+            // Remember the response so exhausting retries reports the real
+            // status instead of a generic error.
+            lastErr = new GhlHttpError({ status: res.status, url: url.toString(), bodyText: text });
+            if (attempt >= maxAttempts) break;
             const retryAfter = res.headers.get('retry-after');
-            const baseDelay = Math.min(4000, 250 * 2 ** (attempt - 1));
-            const waitMs = retryAfter ? Number(retryAfter) * 1000 : jitter(baseDelay);
+            // Retry-After may be an HTTP date (or blank), which must fall
+            // back to backoff rather than Number()-coercing to NaN/0.
+            const retryAfterSec = retryAfter && retryAfter.trim() !== '' ? Number(retryAfter) : NaN;
+            const baseDelay = Math.min(4000, this.baseDelayMs * 2 ** (attempt - 1));
+            const waitMs =
+              Number.isFinite(retryAfterSec) && retryAfterSec >= 0
+                ? Math.min(retryAfterSec * 1000, MAX_RETRY_AFTER_MS)
+                : jitter(baseDelay);
             await sleep(waitMs);
             continue;
           }
           throw new GhlHttpError({ status: res.status, url: url.toString(), bodyText: text });
         }
 
-        const data = (text ? (JSON.parse(text) as T) : ({} as T));
+        let data: T;
+        if (!text) {
+          data = {} as T;
+        } else {
+          try {
+            data = JSON.parse(text) as T;
+          } catch {
+            throw new GhlParseError({ status: res.status, url: url.toString(), bodyText: text });
+          }
+        }
         return { status: res.status, data, url: url.toString() };
       } catch (err) {
         lastErr = err;
+        // GhlHttpError (and its GhlParseError subclass) are never retried here.
         if (err instanceof GhlHttpError) throw err;
         if (attempt >= maxAttempts) break;
         // Network errors and timeouts: retry with backoff.
-        const baseDelay = Math.min(4000, 250 * 2 ** (attempt - 1));
+        const baseDelay = Math.min(4000, this.baseDelayMs * 2 ** (attempt - 1));
         // For abort errors, don't wait long; it was already a timeout.
         await sleep(isAbortError(err) ? Math.min(250, baseDelay) : jitter(baseDelay));
       } finally {

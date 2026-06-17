@@ -7,13 +7,11 @@ import type { AutomationStep, AuditLogEntry, RunEvent, Severity, StepStatus } fr
 import type { RunSseHub } from './sse';
 import { GhlClient, GhlHttpError } from './ghl/client';
 import { getGhlIntegration, setGhlIntegration } from './ghl/integration';
+import { firstLocationFromSearchResponse } from './ghl/locations';
+import { applySaveMappings, interpolateAny, interpolateString, isPlainObject } from './template';
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
 function sandboxPathForPageKey(pageKey: string | undefined): string {
@@ -71,101 +69,6 @@ async function extractForStep(page: Page, step: AutomationStep): Promise<Record<
     return { target: step.target, text: (text ?? '').trim() };
   }
   return {};
-}
-
-function getVar(vars: Record<string, unknown>, key: string): unknown {
-  const parts = key.split('.');
-  let cur: unknown = vars;
-  for (const p of parts) {
-    if (!cur || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
-}
-
-function interpolateString(template: string, vars: Record<string, unknown>): string {
-  return template.replace(/{{\s*([a-zA-Z0-9_.-]+)\s*}}/g, (_m, key) => {
-    const v = getVar(vars, key);
-    if (v === undefined || v === null) return '';
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
-    return JSON.stringify(v);
-  });
-}
-
-function interpolateAny(value: unknown, vars: Record<string, unknown>): unknown {
-  if (typeof value === 'string') return interpolateString(value, vars);
-  if (Array.isArray(value)) return value.map((v) => interpolateAny(v, vars));
-  if (isPlainObject(value)) {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = interpolateAny(v, vars);
-    return out;
-  }
-  return value;
-}
-
-function decodePointerToken(t: string) {
-  return t.replace(/~1/g, '/').replace(/~0/g, '~');
-}
-
-function jsonPointerGet(doc: unknown, pointer: string): unknown {
-  if (!pointer) return undefined;
-  if (pointer === '/' || pointer === '') return doc;
-  if (!pointer.startsWith('/')) return undefined;
-  const tokens = pointer.split('/').slice(1).map(decodePointerToken);
-  let cur: unknown = doc;
-  for (const tok of tokens) {
-    if (Array.isArray(cur)) {
-      const idx = Number(tok);
-      if (!Number.isInteger(idx) || idx < 0 || idx >= cur.length) return undefined;
-      cur = cur[idx];
-      continue;
-    }
-    if (cur && typeof cur === 'object') {
-      cur = (cur as Record<string, unknown>)[tok];
-      continue;
-    }
-    return undefined;
-  }
-  return cur;
-}
-
-function applySaveMappings(
-  save: AutomationStep['save'] | undefined,
-  data: unknown,
-  vars: Record<string, unknown>
-) {
-  if (!save) return {};
-  const saved: Record<string, unknown> = {};
-  for (const [varName, pointers] of Object.entries(save)) {
-    const list = Array.isArray(pointers) ? pointers : [pointers];
-    let value: unknown = undefined;
-    for (const p of list) {
-      value = jsonPointerGet(data, p);
-      if (value !== undefined) break;
-    }
-    if (value === undefined) continue;
-    vars[varName] = value;
-    saved[varName] = value;
-  }
-  return saved;
-}
-
-function firstLocationFromSearchResponse(data: unknown): { id: string; name?: string } | null {
-  if (Array.isArray(data)) {
-    const first = data[0];
-    if (isPlainObject(first)) {
-      const id = (typeof first._id === 'string' && first._id) || (typeof first.id === 'string' && first.id) || '';
-      if (!id) return null;
-      const name = typeof first.name === 'string' ? first.name : undefined;
-      return { id, name };
-    }
-    return null;
-  }
-  if (isPlainObject(data)) {
-    const locations = data.locations;
-    if (Array.isArray(locations)) return firstLocationFromSearchResponse(locations);
-  }
-  return null;
 }
 
 async function assertForStep(page: Page, step: AutomationStep) {
@@ -266,6 +169,12 @@ export class Runner {
   private async runOne(runId: string, steps: AutomationStep[]) {
     const ctrl = this.controls.get(runId);
     if (!ctrl) return;
+    if (ctrl.aborted) {
+      // Aborted while still queued: abort() already marked the run; don't
+      // flip it back to 'running'.
+      this.controls.delete(runId);
+      return;
+    }
 
     const startedAt = now();
     this.db.updateRun({ id: runId, status: 'running', startedAt });
@@ -359,7 +268,9 @@ export class Runner {
               break;
             }
             case 'wait': {
-              const waitMs = parseInt(step.value || String(step.duration ?? '1000'), 10) || 1000;
+              const parsed = parseInt(step.value || String(step.duration ?? '1000'), 10);
+              // An explicit 0 is a valid wait; only NaN falls back to 1s.
+              const waitMs = Number.isFinite(parsed) ? Math.max(0, parsed) : 1000;
               await delay(waitMs);
               message = `Waited ${waitMs}ms`;
               break;
@@ -373,11 +284,12 @@ export class Runner {
             }
             case 'select': {
               if (!step.target) throw new Error('select step missing target');
+              const target = step.target;
               const p = await ensurePage();
               const value = step.value ?? '';
               await maybeScrollToTarget(p, step);
-              await p.selectOption(step.target, { label: value }).catch(async () => {
-                await p.selectOption(step.target, { value });
+              await p.selectOption(target, { label: value }).catch(async () => {
+                await p.selectOption(target, { value });
               });
               await delay(250);
               message = `Selected "${value}" from ${step.target}`;
@@ -420,7 +332,8 @@ export class Runner {
             }
             case 'api': {
               if (!step.api) throw new Error('api step missing api config');
-              if (step.api.service !== 'ghl') throw new Error(`Unsupported api service: ${step.api.service}`);
+              const api = step.api;
+              if (api.service !== 'ghl') throw new Error(`Unsupported api service: ${api.service}`);
 
               let integration = getGhlIntegration(this.db);
               if (!integration) {
@@ -445,11 +358,11 @@ export class Runner {
                 }
               }
 
-              const apiPath = interpolateString(step.api.path, vars);
-              const query = (interpolateAny(step.api.query ?? {}, vars) || {}) as Record<string, unknown>;
-              const body = interpolateAny(step.api.body, vars);
+              const apiPath = interpolateString(api.path, vars);
+              const query = (interpolateAny(api.query ?? {}, vars) || {}) as Record<string, unknown>;
+              const body = interpolateAny(api.body, vars);
 
-              const injectLocationId = step.api.injectLocationId !== false;
+              const injectLocationId = api.injectLocationId !== false;
               if (injectLocationId && integration.locationId) {
                 if (query.locationId === undefined) query.locationId = integration.locationId;
                 if (isPlainObject(body) && body.locationId === undefined) body.locationId = integration.locationId;
@@ -461,11 +374,11 @@ export class Runner {
               const res = await (async () => {
                 try {
                   return await ghl.request({
-                    method: step.api.method,
+                    method: api.method,
                     path: apiPath,
                     query: query as Record<string, string | number | boolean | null | undefined>,
                     body,
-                    timeoutMs: step.api.timeoutMs,
+                    timeoutMs: api.timeoutMs,
                   });
                 } finally {
                   addEvent(this.db, this.hub, runId, { type: 'ui', runId, ts: now(), action: { kind: 'scanline', show: false } });
@@ -475,12 +388,12 @@ export class Runner {
               const saved = applySaveMappings(step.save, res.data, vars);
               await delay(250);
 
-              message = `[GHL] ${step.api.method} ${apiPath} -> ${res.status}`;
+              message = `[GHL] ${api.method} ${apiPath} -> ${res.status}`;
               severity = 'success';
               extras = {
                 extractedData: {
                   service: 'ghl',
-                  request: { method: step.api.method, path: apiPath, query, body },
+                  request: { method: api.method, path: apiPath, query, body },
                   response: { status: res.status, url: res.url, data: res.data },
                   saved,
                   autoSelectedLocation,
@@ -535,6 +448,9 @@ export class Runner {
       this.db.updateRun({ id: runId, status: 'completed', endedAt: now() });
       addEvent(this.db, this.hub, runId, { type: 'run_completed', runId, ts: now() });
     } catch (err) {
+      // A step failing while the run is being aborted must not overwrite the
+      // terminal 'aborted' state abort() already recorded.
+      if (ctrl.aborted) return;
       const msg = err instanceof Error ? err.message : String(err);
       this.db.updateRun({ id: runId, status: 'failed', endedAt: now(), error: msg });
       addEvent(this.db, this.hub, runId, { type: 'run_failed', runId, ts: now(), error: msg });

@@ -19,6 +19,16 @@ npm run dev
 
 The Vite dev server proxies `/api/*` and `/artifacts/*` to the API server.
 
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together.
+
+## Test
+
+```bash
+npm test          # server unit + API tests (node:test via tsx, no browser needed)
+npm run typecheck # type-check UI, server, and tests (also part of `npm run build`)
+npm run lint
+```
+
 ## What Makes It “Real”
 
 - Runs are persisted in `./data/forgg.sqlite`

@@ -33,17 +33,5 @@ export class RunSseHub {
       }
     }
   }
-
-  keepAlive(runId: string) {
-    const set = this.byRunId.get(runId);
-    if (!set) return;
-    for (const client of set) {
-      try {
-        client.res.write(`: ping\n\n`);
-      } catch {
-        // ignore
-      }
-    }
-  }
 }
 
