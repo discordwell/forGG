@@ -9,7 +9,7 @@
     "dev:server": "tsx watch server/src/index.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --import tsx --test \"server/test/**/*.test.ts\"",
+    "test": "node --import tsx --test \"server/test/**/*.test.ts\" \"src/**/*.test.ts\"",
     "typecheck": "tsc -b",
     "preview": "vite preview"
   },

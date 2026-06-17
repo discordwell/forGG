@@ -75,22 +75,45 @@ event is lost or duplicated in between).
 
 ## Frontend (`src/`)
 
-React 19 + Vite + Tailwind. `AutomationContext` holds steps + execution state;
-`useAutomationEngine` is the only bridge to the backend: it POSTs the run,
-opens the SSE stream, and dispatches incoming events (`step_status`,
-`audit_entry`, `ui` cursor/typing/flash hints) into the reducer. Components:
-step builder (left), simulated browser viewport (center), audit trail (right).
-Scenarios live in `src/data/` (currently the MaxLevel GHL lead-intake
-workflow).
+React 19 + Vite + Tailwind. State is split so the logic is testable without a
+DOM:
+
+- **`context/automationReducer.ts`** — the pure reducer + initial state. Holds
+  steps and the derived `ExecutionState` (status, per-step statuses, audit log,
+  cursor/typing/flash hints). `context/AutomationContext.tsx` is now just the
+  React glue (contexts + provider) around it.
+- **`hooks/runController.ts`** — `RunController`, a framework-agnostic object
+  that owns one backend run's imperative lifecycle (create → stream →
+  pause/resume → abort). Its network/stream dependencies are injected, so it is
+  unit-tested with fakes. `eventToActions`/`isTerminalEvent` are the pure
+  SSE-event → reducer-action translation. Invariant: every teardown path
+  (terminal event, stream error, **and** explicit abort) resets the internal
+  `started` guard — otherwise the next run is silently blocked.
+- **`hooks/useAutomationEngine.ts`** — the thin React adapter: creates the
+  controller once, mirrors UI status onto it, and supplies the real `fetch`
+  (`POST /api/runs`, pause/resume/abort) and `EventSource` stream.
+
+Components: step builder (left), simulated browser viewport (center), audit
+trail (right). Scenarios live in `src/data/` (currently the MaxLevel GHL
+lead-intake workflow).
 
 ## Testing
 
-`npm test` runs `node:test` via tsx (no extra test framework): pure helpers,
-the SQLite layer, zod schemas, `GhlClient` retry behavior (mocked `fetch`),
-HTTP routes (`app.inject()` with a fake runner), and real `Runner` lifecycle
-tests using wait-only steps (no browser needed). The server is fully
-type-checked by `tsconfig.server.json`, which is part of `tsc -b` (and thus
-`npm run build`).
+`npm test` runs `node:test` via tsx (no extra test framework) over both
+`server/test/**` and `src/**/*.test.ts`:
+
+- **Server:** pure helpers, the SQLite layer, zod schemas, `GhlClient` retry
+  behavior (mocked `fetch`), HTTP routes (`app.inject()` with a fake runner),
+  and real `Runner` lifecycle tests using wait-only steps (no browser needed).
+- **Frontend:** the full `automationReducer` action surface, and the
+  `RunController` lifecycle (incl. the regression where stopping a run wedged
+  the next "Execute") plus `eventToActions`/`isTerminalEvent` — all with fakes,
+  no DOM.
+
+Type-checking is split across `tsc -b` project references:
+`tsconfig.server.json` (server src + tests), `tsconfig.app.json` (UI, excluding
+tests), and `tsconfig.test.json` (the frontend `*.test.ts`, which need node
+types). All are part of `npm run build`.
 
 ## Conventions
 
