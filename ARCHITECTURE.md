@@ -45,6 +45,11 @@ server events streamed over SSE.
 - **`src/template.ts`** — pure helpers: `{{var}}` interpolation (dotted
   paths), RFC-6901-style JSON pointer lookup, and `save` mappings that copy
   values from API responses into run variables.
+- **`src/steps.ts`** — pure step helpers lifted out of the runner so they are
+  unit-testable without Playwright: sandbox-page path, default audit severity,
+  `wait` duration parsing (explicit `0` honored, negatives clamped), and
+  assert-step evaluation (`equals`/`contains`/`greaterThan`; the numeric
+  comparison parses decimals on both sides).
 - **`src/db.ts`** — better-sqlite3 (WAL). Tables: `runs`, `events`
   (append-only log, FK to runs, enforced), `kv` (integration store).
 - **`src/sse.ts`** — `RunSseHub`, a per-run set of connected SSE clients.
@@ -102,9 +107,13 @@ lead-intake workflow).
 `npm test` runs `node:test` via tsx (no extra test framework) over both
 `server/test/**` and `src/**/*.test.ts`:
 
-- **Server:** pure helpers, the SQLite layer, zod schemas, `GhlClient` retry
-  behavior (mocked `fetch`), HTTP routes (`app.inject()` with a fake runner),
-  and real `Runner` lifecycle tests using wait-only steps (no browser needed).
+- **Server:** pure helpers (`template`, and `steps` — the `wait` parsing and
+  the assert-step `equals`/`contains`/`greaterThan` evaluation), the SQLite
+  layer, zod schemas, `GhlClient` retry behavior (mocked `fetch`), HTTP routes
+  (`app.inject()` with a fake runner) plus the SSE `/events` route against a
+  live server (history replays, then live broadcasts stream, in order, with no
+  duplication), and real `Runner` lifecycle tests using wait-only steps (no
+  browser needed).
 - **Frontend:** the full `automationReducer` action surface, and the
   `RunController` lifecycle (incl. the regression where stopping a run wedged
   the next "Execute") plus `eventToActions`/`isTerminalEvent` — all with fakes,

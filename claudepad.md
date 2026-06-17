@@ -2,6 +2,27 @@
 
 ## Session Summaries
 
+### 2026-06-17 ~14:06 UTC — Runner step-logic extraction; greaterThan bug fix; SSE route test
+- Extracted the runner's pure step helpers into `server/src/steps.ts` (mirrors
+  `template.ts`/`locations.ts`): `sandboxPathForPageKey`, `severityForStep`,
+  `parseWaitMs`, `cleanNumber`, and `evaluateAssertion`. `runner.ts` now imports
+  them; `assertForStep` does the page I/O then delegates the comparison. Pure,
+  behavior-preserving refactor — all 96 prior tests stayed green.
+- **Bug fixed (with regression test):** the `greaterThan` assert stripped the
+  decimal point from the *threshold* only (`/[^0-9]/g`) while keeping it in the
+  *actual* (`/[^0-9.]/g`), so `"> 1.5"` became `15` and `2 > 1.5` wrongly
+  failed. `cleanNumber` now parses decimals on both sides. Reachable via the
+  public `POST /api/runs` (schema allows any `assertion` string).
+- Added `server/test/steps.test.ts` (10 tests): sandbox path, severity, wait
+  parsing (explicit 0 / negatives / units / fallbacks), `cleanNumber`, and all
+  three assertion modes incl. the decimal regression and the unsupported path.
+- Added `server/test/events-sse.test.ts` (2 tests) — the previously-untested
+  `GET /api/runs/:id/events` route, against a **live** `app.listen({port:0})`
+  server with a raw HTTP SSE reader: history replays, a post-connect
+  `hub.broadcast` streams live, ordering is history-before-live, history is not
+  duplicated; plus the 404 path. Verified stable across 5 back-to-back runs.
+- Verified: typecheck (4 projects), lint, 108/108 tests, full build.
+
 ### 2026-06-17 ~04:40 UTC — Landed test-suite WIP; frontend testability + run-lifecycle bugfix
 - Committed the prior uncommitted WIP (server test suite + testability refactor
   + GhlClient/Runner bug fixes) as its own clean commit after verifying it
@@ -56,6 +77,12 @@
 
 ## Key Findings
 
+- Assert-step semantics live in `server/src/steps.ts::evaluateAssertion`
+  (`equals` default, `contains`, `greaterThan`). The `assertion` field is only
+  settable via the API (`POST /api/runs`) — the StepCard UI exposes type/label/
+  target/value but not the assertion selector. `greaterThan` extracts a number
+  with `cleanNumber` (digits + `.`), so no-digit text → `0` (comparable, not an
+  error) and only a malformed number like `"1.2.3"` → NaN → "unable to compare".
 - The server runs via `tsx` (no type checking at runtime); before this session
   `tsc -b` covered only `src/` and `vite.config.ts`. Server type-checking now
   lives in `tsconfig.server.json` — keep it in the root references.

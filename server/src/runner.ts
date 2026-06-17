@@ -9,14 +9,10 @@ import { GhlClient, GhlHttpError } from './ghl/client';
 import { getGhlIntegration, setGhlIntegration } from './ghl/integration';
 import { firstLocationFromSearchResponse } from './ghl/locations';
 import { applySaveMappings, interpolateAny, interpolateString, isPlainObject } from './template';
+import { evaluateAssertion, parseWaitMs, sandboxPathForPageKey, severityForStep } from './steps';
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-function sandboxPathForPageKey(pageKey: string | undefined): string {
-  if (!pageKey) return '/sandbox/blank.html';
-  return `/sandbox/${pageKey}.html`;
 }
 
 async function waitForUnpause(ctrl: RunControl) {
@@ -29,6 +25,9 @@ function now() {
   return Date.now();
 }
 
+// Pure step helpers (sandbox path, severity, wait duration, assertion
+// evaluation) live in ./steps so they can be unit-tested without Playwright.
+
 function addEvent(db: Db, hub: RunSseHub, runId: string, event: RunEvent) {
   db.addEvent({ runId, ts: event.ts, type: event.type, payloadJson: JSON.stringify(event) });
   hub.broadcast(runId, event);
@@ -40,17 +39,6 @@ function setStepStatus(db: Db, hub: RunSseHub, runId: string, index: number, sta
 
 function addAudit(db: Db, hub: RunSseHub, runId: string, entry: AuditLogEntry) {
   addEvent(db, hub, runId, { type: 'audit_entry', runId, ts: now(), entry });
-}
-
-function severityForStep(stepType: string): Severity {
-  switch (stepType) {
-    case 'extract':
-    case 'assert':
-    case 'api':
-      return 'success';
-    default:
-      return 'info';
-  }
 }
 
 async function maybeScrollToTarget(page: Page, step: AutomationStep) {
@@ -73,34 +61,10 @@ async function extractForStep(page: Page, step: AutomationStep): Promise<Record<
 
 async function assertForStep(page: Page, step: AutomationStep) {
   if (!step.target) throw new Error('assert step missing target');
-  const assertion = step.assertion ?? 'equals';
-  const expected = step.value ?? '';
   const actualRaw = await page.locator(step.target).first().textContent().catch(() => null);
   const actual = (actualRaw ?? '').trim();
-
-  if (assertion === 'contains') {
-    if (!actual.includes(expected)) throw new Error(`Assertion failed: expected "${actual}" to contain "${expected}"`);
-    return;
-  }
-
-  if (assertion === 'equals') {
-    if (actual !== expected) throw new Error(`Assertion failed: expected "${actual}" to equal "${expected}"`);
-    return;
-  }
-
-  if (assertion === 'greaterThan') {
-    // expected value like "> 50" (from existing scenario)
-    const thresholdStr = expected.replace(/[^0-9]/g, '');
-    const threshold = Number(thresholdStr);
-    const actualNum = Number(actual.replace(/[^0-9.]/g, ''));
-    if (!Number.isFinite(threshold) || !Number.isFinite(actualNum)) {
-      throw new Error(`Assertion failed: unable to compare "${actual}" > "${expected}"`);
-    }
-    if (!(actualNum > threshold)) throw new Error(`Assertion failed: expected ${actualNum} > ${threshold}`);
-    return;
-  }
-
-  throw new Error(`Unsupported assertion: ${assertion}`);
+  const result = evaluateAssertion(step.assertion ?? 'equals', step.value ?? '', actual);
+  if (!result.ok) throw new Error(result.reason);
 }
 
 export interface RunControl {
@@ -268,9 +232,7 @@ export class Runner {
               break;
             }
             case 'wait': {
-              const parsed = parseInt(step.value || String(step.duration ?? '1000'), 10);
-              // An explicit 0 is a valid wait; only NaN falls back to 1s.
-              const waitMs = Number.isFinite(parsed) ? Math.max(0, parsed) : 1000;
+              const waitMs = parseWaitMs(step);
               await delay(waitMs);
               message = `Waited ${waitMs}ms`;
               break;
