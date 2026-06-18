@@ -58,11 +58,13 @@ export function eventToActions(ev: RunEvent): AutomationAction[] {
       if (a.kind === 'scanline') return [{ type: 'SET_SCANLINE', show: a.show }];
       return [];
     }
-    // A failed run still renders a summary: per-step statuses already carry the
-    // failure, so the run is marked complete for the UI.
+    // Both terminal states render a summary (per-step statuses already carry the
+    // outcome), but a failure lands in a distinct 'error' status so the UI shows
+    // it as failed instead of as a successful completion.
     case 'run_completed':
-    case 'run_failed':
       return [{ type: 'COMPLETE_EXECUTION' }];
+    case 'run_failed':
+      return [{ type: 'FAIL_EXECUTION' }];
     case 'run_started':
     case 'run_paused':
     case 'run_resumed':

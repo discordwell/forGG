@@ -293,6 +293,19 @@ export function automationReducer(
         },
       };
 
+    // A failed run is terminal like COMPLETE_EXECUTION (per-step statuses and the
+    // audit log already carry the failure detail) but lands in a distinct 'error'
+    // status so the UI shows it as failed rather than as a successful completion.
+    case 'FAIL_EXECUTION':
+      return {
+        ...state,
+        execution: {
+          ...state.execution,
+          status: 'error',
+          endTime: new Date(),
+        },
+      };
+
     default:
       return state;
   }

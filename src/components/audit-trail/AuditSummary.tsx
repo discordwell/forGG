@@ -5,7 +5,7 @@ import { useAutomation } from '../../context/AutomationContext';
 export function AuditSummary() {
   const { steps, execution } = useAutomation();
 
-  if (execution.status !== 'completed') return null;
+  if (execution.status !== 'completed' && execution.status !== 'error') return null;
 
   const passed = execution.stepStatuses.filter((s) => s === 'passed').length;
   const failed = execution.stepStatuses.filter((s) => s === 'failed').length;
@@ -48,11 +48,11 @@ export function AuditSummary() {
             <p className="font-mono font-medium text-surface-800">{duration}s</p>
           </div>
         </div>
-        {execution.startTime && (
+        {execution.startTime && execution.endTime && (
           <div className="col-span-2">
-            <span className="text-surface-500">Completed</span>
+            <span className="text-surface-500">Finished</span>
             <p className="font-mono font-medium text-surface-800 text-[10px]">
-              {format(execution.endTime!, 'yyyy-MM-dd HH:mm:ss')}
+              {format(execution.endTime, 'yyyy-MM-dd HH:mm:ss')}
             </p>
           </div>
         )}

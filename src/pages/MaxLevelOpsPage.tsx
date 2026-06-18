@@ -5,8 +5,10 @@ import { useAutomation } from '../context/AutomationContext';
 function classForStatus(status: string | undefined) {
   switch (status) {
     case 'passed':
+    case 'completed':
       return 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30';
     case 'failed':
+    case 'error':
       return 'bg-red-500/15 text-red-200 border-red-500/30';
     case 'running':
       return 'bg-blue-500/15 text-blue-200 border-blue-500/30';

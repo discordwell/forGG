@@ -105,4 +105,5 @@ export type AutomationAction =
   | { type: 'SET_SCANLINE'; show: boolean }
   | { type: 'SET_TYPING'; text: string; target: string }
   | { type: 'RESET_EXECUTION' }
-  | { type: 'COMPLETE_EXECUTION' };
+  | { type: 'COMPLETE_EXECUTION' }
+  | { type: 'FAIL_EXECUTION' };

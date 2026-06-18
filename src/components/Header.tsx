@@ -223,6 +223,7 @@ export function Header() {
             execution.status === 'running' ? 'text-forge-500 animate-pulse' :
             execution.status === 'paused' ? 'text-amber-500' :
             execution.status === 'completed' ? 'text-green-500' :
+            execution.status === 'error' ? 'text-red-500' :
             'text-surface-400'
           }`} />
           <span className="text-xs font-medium text-surface-600 capitalize">

@@ -192,6 +192,21 @@ test('COMPLETE_EXECUTION marks completed and records an end time', () => {
   assert.ok(next.execution.endTime instanceof Date);
 });
 
+test('FAIL_EXECUTION marks error (not completed), records an end time, and keeps the failure detail', () => {
+  let state = automationReducer(stateWith([step('a'), step('b')]), { type: 'START_EXECUTION' });
+  state = automationReducer(state, { type: 'SET_STEP_STATUS', index: 0, status: 'passed' });
+  state = automationReducer(state, { type: 'SET_STEP_STATUS', index: 1, status: 'failed' });
+  state = automationReducer(state, { type: 'ADD_AUDIT_ENTRY', entry: audit('e1') });
+  const next = automationReducer(state, { type: 'FAIL_EXECUTION' });
+  // A failed run must NOT masquerade as a successful completion.
+  assert.equal(next.execution.status, 'error');
+  assert.notEqual(next.execution.status, 'completed');
+  assert.ok(next.execution.endTime instanceof Date);
+  // The per-step statuses and audit log that carry the failure detail survive.
+  assert.deepEqual(next.execution.stepStatuses, ['passed', 'failed']);
+  assert.deepEqual(next.execution.auditLog.map((e) => e.id), ['e1']);
+});
+
 test('RESET_EXECUTION returns to idle pending state while preserving speed', () => {
   let state = automationReducer(stateWith([step('a'), step('b')]), { type: 'SET_SPEED', speed: 2 });
   state = automationReducer(state, { type: 'START_EXECUTION' });

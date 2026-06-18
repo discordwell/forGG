@@ -43,7 +43,7 @@ export function AuditTrailPanel() {
         )}
       </div>
 
-      {execution.status === 'completed' && (
+      {(execution.status === 'completed' || execution.status === 'error') && (
         <div className="p-4 border-t border-surface-200">
           <AuditSummary />
         </div>

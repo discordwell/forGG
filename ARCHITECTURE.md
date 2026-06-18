@@ -89,14 +89,18 @@ DOM:
 - **`context/automationReducer.ts`** — the pure reducer + initial state. Holds
   steps and the derived `ExecutionState` (status, per-step statuses, audit log,
   cursor/typing/flash hints). `context/AutomationContext.tsx` is now just the
-  React glue (contexts + provider) around it.
+  React glue (contexts + provider) around it. The two terminal outcomes are
+  distinct statuses: `COMPLETE_EXECUTION` → `completed` and `FAIL_EXECUTION` →
+  `error`, so a failed run renders as failed (red) rather than as a successful
+  completion (green).
 - **`hooks/runController.ts`** — `RunController`, a framework-agnostic object
   that owns one backend run's imperative lifecycle (create → stream →
   pause/resume → abort). Its network/stream dependencies are injected, so it is
   unit-tested with fakes. `eventToActions`/`isTerminalEvent` are the pure
-  SSE-event → reducer-action translation. Invariant: every teardown path
-  (terminal event, stream error, **and** explicit abort) resets the internal
-  `started` guard — otherwise the next run is silently blocked.
+  SSE-event → reducer-action translation (`run_completed` → `COMPLETE_EXECUTION`,
+  `run_failed` → `FAIL_EXECUTION`). Invariant: every teardown path (terminal
+  event, stream error, **and** explicit abort) resets the internal `started`
+  guard — otherwise the next run is silently blocked.
 - **`hooks/useAutomationEngine.ts`** — the thin React adapter: creates the
   controller once, mirrors UI status onto it, and supplies the real `fetch`
   (`POST /api/runs`, pause/resume/abort) and `EventSource` stream.

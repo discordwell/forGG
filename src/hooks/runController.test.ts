@@ -286,9 +286,11 @@ test('eventToActions maps each ui hint to its setter', () => {
   assert.deepEqual(eventToActions({ ...base, type: 'ui', action: { kind: 'scanline', show: false } }).map((a) => a.type), ['SET_SCANLINE']);
 });
 
-test('eventToActions marks completed and failed runs complete, and ignores other lifecycle events', () => {
+test('eventToActions maps completed to COMPLETE, failed to FAIL, and ignores other lifecycle events', () => {
   assert.deepEqual(eventToActions({ type: 'run_completed', runId: 'r', ts: 0 }).map((a) => a.type), ['COMPLETE_EXECUTION']);
-  assert.deepEqual(eventToActions({ type: 'run_failed', runId: 'r', ts: 0, error: 'x' }).map((a) => a.type), ['COMPLETE_EXECUTION']);
+  // A failed run is distinct from a completed one so the UI can render it as
+  // failed rather than as a green "completed".
+  assert.deepEqual(eventToActions({ type: 'run_failed', runId: 'r', ts: 0, error: 'x' }).map((a) => a.type), ['FAIL_EXECUTION']);
   assert.deepEqual(eventToActions({ type: 'run_started', runId: 'r', ts: 0 }), []);
   assert.deepEqual(eventToActions({ type: 'run_paused', runId: 'r', ts: 0 }), []);
   assert.deepEqual(eventToActions({ type: 'run_aborted', runId: 'r', ts: 0 }), []);

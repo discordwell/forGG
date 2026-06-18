@@ -14,7 +14,12 @@ export function PlaybackControls() {
   const { execution } = useAutomation();
   const dispatch = useAutomationDispatch();
 
-  const isIdle = execution.status === 'idle' || execution.status === 'completed';
+  // 'completed' and 'error' are both terminal: the run is over, so show "Execute"
+  // (offer a re-run) rather than the pause/stop controls.
+  const isIdle =
+    execution.status === 'idle' ||
+    execution.status === 'completed' ||
+    execution.status === 'error';
   const isRunning = execution.status === 'running';
   const isPaused = execution.status === 'paused';
 

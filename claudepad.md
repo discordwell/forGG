@@ -2,6 +2,34 @@
 
 ## Session Summaries
 
+### 2026-06-17 ~21:30 UTC — Failed runs now render as "error" (red), not green "completed"
+- **Bug fixed (with tests + browser wet test):** a failed backend run displayed
+  as a successful green "completed" in the Header and Ops Console. The `'error'`
+  member of `ExecutionState['status']` existed in the type but was never set:
+  `eventToActions` mapped BOTH `run_completed` and `run_failed` to
+  `COMPLETE_EXECUTION` → `status: 'completed'`. Only `AuditSummary` (which derives
+  PASSED/FAILED from per-step statuses) showed the failure; the top-level status
+  read as success.
+- **Fix:** added a distinct `FAIL_EXECUTION` action (reducer → `status: 'error'`,
+  `endTime`); `run_failed` now maps to it. Wired `'error'` through every
+  `execution.status` consumer that special-cased `'completed'`: Header icon
+  (red), `PlaybackControls.isIdle` (so Execute/re-run reappears), `AuditSummary`
+  + `AuditTrailPanel` render gates, and `MaxLevelOpsPage.classForStatus`
+  (`error`→red, `completed`→emerald). Also hardened `AuditSummary`'s `endTime!`
+  into a real `startTime && endTime` guard and relabeled its timestamp
+  "Completed"→"Finished" (accurate for both terminal states).
+- Tests: new `FAIL_EXECUTION` reducer test (status `error`, end time, preserves
+  stepStatuses + auditLog); updated the `eventToActions` test to expect
+  `run_failed` → `FAIL_EXECUTION`. 117/117 pass.
+- **Wet test (token-free, isolated):** ran `buildApp` on a throwaway temp data
+  dir (no GHL token → the first `api` step fails fast, real account untouched)
+  on :8787 + vite on :5173, drove it headless with Playwright. A failed run
+  renders header status "Error" with `text-red-500` (and zero `text-green-500`),
+  red Ops-Console pill, "Runbook FAILED" summary, the Execute button returns for
+  re-run, and **0 console/page errors**.
+- Verified: typecheck (4 projects), lint, 117/117 tests, full build, a 3-finder
+  Explore pass + a 1-vote adversarial code-review subagent (no findings).
+
 ### 2026-06-17 ~20:26 UTC — listRuns non-integer-limit 500 fix; SSE hub tests + correct dead-client pruning
 - Landed the prior WIP first (steps.ts extraction + greaterThan fix + SSE route
   test) as its own commit, and removed a stray root-level `leak_probe.test.ts`
@@ -149,3 +177,13 @@
 - Frontend logic is tested without a DOM by keeping it framework-free: the
   reducer is pure, and `RunController` takes injected `postJson`/`openStream`
   deps. Tests run under `tsconfig.test.json` (node types + DOM lib).
+- A run has TWO distinct terminal statuses: `completed` (`COMPLETE_EXECUTION`,
+  from `run_completed`) and `error` (`FAIL_EXECUTION`, from `run_failed`). Both
+  set `endTime` and preserve per-step statuses + the audit log. Any UI that
+  special-cases `completed` (terminal-ness, "Execute"/re-run gating, summary
+  rendering, success styling) must handle `error` too. Consumers that only branch
+  on `running`/`paused` (keyboard shortcuts, `isRunning` disables, the engine's
+  start/pause/abort effects) need no `error` branch — `error` is non-running and
+  non-idle, so they behave like they did for `completed`. The backend guarantees
+  a `step_status:'failed'` precedes every `run_failed`, so the FAILED summary is
+  always correct (never a green PASSED on a failed run).
