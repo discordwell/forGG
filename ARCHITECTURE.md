@@ -109,6 +109,16 @@ Components: step builder (left), simulated browser viewport (center), audit
 trail (right). Scenarios live in `src/data/` (currently the MaxLevel GHL
 lead-intake workflow).
 
+The same "extract the pure logic, keep the `.tsx` as thin glue" split is
+applied at the component level so the non-trivial derivations are unit-testable
+without a DOM: `pages/maxLevelOps.logic.ts` (status→pill class, and the
+newest-wins `deriveSavedEntities` collapse of `save` mappings across the audit
+log), `components/audit-trail/auditSummary.logic.ts` (`summarizeRun` →
+passed/total/allPassed/duration), and `lib/ghlLocations.ts` (`parseGhlLocations`
+— tolerates both the `_id` and `id` location shapes and the
+`{ locations: [...] }` envelope, matching the server's
+`firstLocationFromSearchResponse`, then normalizes to a single `id`).
+
 ## Testing
 
 `npm test` runs `node:test` via tsx (no extra test framework) over both
@@ -123,10 +133,12 @@ lead-intake workflow).
   `/events` route against a live server (history replays, then live broadcasts
   stream, in order, with no duplication), and real `Runner` lifecycle tests
   using wait-only steps (no browser needed).
-- **Frontend:** the full `automationReducer` action surface, and the
+- **Frontend:** the full `automationReducer` action surface, the
   `RunController` lifecycle (incl. the regression where stopping a run wedged
-  the next "Execute") plus `eventToActions`/`isTerminalEvent` — all with fakes,
-  no DOM.
+  the next "Execute") plus `eventToActions`/`isTerminalEvent`, and the extracted
+  component logic — `parseGhlLocations` (incl. the `id`-only shape the dropdown
+  used to drop), `deriveSavedEntities` (newest-wins, null-skip, stringify), and
+  `summarizeRun` (counts + clamped duration) — all with fakes, no DOM.
 
 Type-checking is split across `tsc -b` project references:
 `tsconfig.server.json` (server src + tests), `tsconfig.app.json` (UI, excluding

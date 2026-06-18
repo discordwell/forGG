@@ -2,6 +2,35 @@
 
 ## Session Summaries
 
+### 2026-06-18 ~13:00 UTC — GHL location-shape bugfix + component-logic extraction (UI now tested without a DOM)
+- **Bug fixed (with regression test):** the header's GHL location dropdown
+  silently dropped any location that arrived with `id` instead of `_id`. The
+  client's local `isGhlLocation` required a string `_id`, but the **server**
+  (`firstLocationFromSearchResponse`) accepts either `_id` or `id` and will
+  happily auto-select an `id`-only location — so a connected user could see a
+  location auto-selected yet have an empty/incomplete dropdown and be unable to
+  switch. Fix: new `src/lib/ghlLocations.ts::parseGhlLocations` mirrors the
+  server's tolerance (`_id` **or** `id`, bare array **or** `{ locations: [...] }`
+  envelope), normalizes every entry to a single `id`, and rejects non-string
+  name/timezone. `Header.tsx` imports it and renders `l.id`. 7 new tests incl.
+  the previously-broken `id`-only case.
+- **Component logic extracted + tested (no new deps, no DOM)** — same
+  "pure logic out, `.tsx` stays thin glue" pattern as the reducer/runController:
+  - `pages/maxLevelOps.logic.ts`: `statusPillClass` + `deriveSavedEntities`
+    (collapses `save` mappings across the audit log, newest-wins). Hardened the
+    newest-wins guard from a **truthiness** check (`if (out[k])`) to a
+    **key-presence** check, so an explicit `""` from the newest step is no longer
+    silently replaced by an older value (no change for real GHL IDs/emails; the
+    display coalesces `''` to `—` either way). 8 tests.
+  - `components/audit-trail/auditSummary.logic.ts`: `summarizeRun` →
+    passed/total/allPassed/durationSec. Added a `Math.max(0, …)` duration clamp
+    (matches `MaxLevelOpsPage`; only affects impossible end-before-start). 7 tests.
+- **Verified:** typecheck (4 projects), lint, **139/139 tests** (was 117; +22),
+  full build. Two independent adversarial code-review subagents found **no
+  issues** (confirmed: no stale `_id`/old-symbol consumers; the two behavior
+  tweaks are intentional + tested; the client and server `GhlLocation` types
+  intentionally diverge — separate modules, no shared import).
+
 ### 2026-06-17 ~21:30 UTC — Failed runs now render as "error" (red), not green "completed"
 - **Bug fixed (with tests + browser wet test):** a failed backend run displayed
   as a successful green "completed" in the Header and Ops Console. The `'error'`
@@ -175,8 +204,21 @@
   rule rejects). Don't close a `ref` into a constructor either — have the object
   expose a setter the hook calls from an effect (see `RunController.syncStatus`).
 - Frontend logic is tested without a DOM by keeping it framework-free: the
-  reducer is pure, and `RunController` takes injected `postJson`/`openStream`
-  deps. Tests run under `tsconfig.test.json` (node types + DOM lib).
+  reducer is pure, `RunController` takes injected `postJson`/`openStream` deps,
+  and per-component derivations live in sibling `*.logic.ts` modules
+  (`pages/maxLevelOps.logic.ts`, `components/audit-trail/auditSummary.logic.ts`)
+  with the `.tsx` as thin glue. Tests run under `tsconfig.test.json` (node types
+  + DOM lib). The `npm test` glob is `src/**/*.test.ts` (note: `.ts`, not
+  `.tsx`), so keep extracted logic + its test in `.ts` files.
+- GHL `/locations/search` responses are parsed in TWO places that must stay in
+  sync: the server (`server/src/ghl/locations.ts::firstLocationFromSearchResponse`,
+  used for auto-selecting a location) and the client (`src/lib/ghlLocations.ts::
+  parseGhlLocations`, used for the header dropdown). Both must tolerate a
+  location id as either `_id` (captured internal `backend.leadconnectorhq.com`
+  shape) **or** `id` (public v2 shape), and a bare array **or** a
+  `{ locations: [...] }` envelope. They are separate modules (no cross-boundary
+  import) with intentionally divergent return types — the server returns just
+  the first `{ id, name }`; the client normalizes the whole list to `{ id }`.
 - A run has TWO distinct terminal statuses: `completed` (`COMPLETE_EXECUTION`,
   from `run_completed`) and `error` (`FAIL_EXECUTION`, from `run_failed`). Both
   set `endTime` and preserve per-step statuses + the audit log. Any UI that

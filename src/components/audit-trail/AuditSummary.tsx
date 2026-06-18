@@ -1,22 +1,19 @@
 import { format } from 'date-fns';
 import { CheckCircle2, XCircle, Clock, BarChart3 } from 'lucide-react';
 import { useAutomation } from '../../context/AutomationContext';
+import { summarizeRun } from './auditSummary.logic';
 
 export function AuditSummary() {
   const { steps, execution } = useAutomation();
 
   if (execution.status !== 'completed' && execution.status !== 'error') return null;
 
-  const passed = execution.stepStatuses.filter((s) => s === 'passed').length;
-  const failed = execution.stepStatuses.filter((s) => s === 'failed').length;
-  const total = steps.length;
-  const allPassed = failed === 0;
-  const duration =
-    execution.startTime && execution.endTime
-      ? Math.round(
-          (execution.endTime.getTime() - execution.startTime.getTime()) / 1000
-        )
-      : 0;
+  const { passed, total, allPassed, durationSec } = summarizeRun({
+    stepStatuses: execution.stepStatuses,
+    stepCount: steps.length,
+    startTime: execution.startTime,
+    endTime: execution.endTime,
+  });
 
   return (
     <div className={`rounded-xl border-2 p-4 ${allPassed ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
@@ -45,7 +42,7 @@ export function AuditSummary() {
           <Clock className="w-3.5 h-3.5 text-surface-500" />
           <div>
             <span className="text-surface-500">Duration</span>
-            <p className="font-mono font-medium text-surface-800">{duration}s</p>
+            <p className="font-mono font-medium text-surface-800">{durationSec}s</p>
           </div>
         </div>
         {execution.startTime && execution.endTime && (

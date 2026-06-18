@@ -4,6 +4,7 @@ import { useAutomation, useAutomationDispatch } from '../context/AutomationConte
 import { ProgressBar } from './shared/ProgressBar';
 import { PlaybackControls } from './playback/PlaybackControls';
 import { SCENARIO_BY_ID, SCENARIOS, type ScenarioId } from '../data/scenarios';
+import { parseGhlLocations, type GhlLocation } from '../lib/ghlLocations';
 
 type GhlStatus =
   | { connected: false }
@@ -15,21 +16,6 @@ type GhlStatus =
       hasTokenId: boolean;
       capturedAt: number;
     };
-
-type GhlLocation = { _id: string; name?: string; timezone?: string };
-
-function isGhlLocation(v: unknown): v is GhlLocation {
-  return Boolean(v) && typeof v === 'object' && typeof (v as { _id?: unknown })._id === 'string';
-}
-
-function parseGhlLocations(data: unknown): GhlLocation[] {
-  if (Array.isArray(data)) return data.filter(isGhlLocation);
-  if (data && typeof data === 'object') {
-    const locs = (data as { locations?: unknown }).locations;
-    if (Array.isArray(locs)) return locs.filter(isGhlLocation);
-  }
-  return [];
-}
 
 export function Header() {
   const { scenarioId, steps, execution } = useAutomation();
@@ -193,8 +179,8 @@ export function Header() {
             title="Select GoHighLevel location"
           >
             {locations.map((l) => (
-              <option key={l._id} value={l._id}>
-                {l.name ? `${l.name} (${l._id})` : l._id}
+              <option key={l.id} value={l.id}>
+                {l.name ? `${l.name} (${l.id})` : l.id}
               </option>
             ))}
           </select>

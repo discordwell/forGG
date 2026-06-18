@@ -1,55 +1,21 @@
 import { useMemo, type ReactNode } from 'react';
 import { Activity, BadgeCheck, CircleDashed, DatabaseZap, Fingerprint, Layers3, Timer } from 'lucide-react';
 import { useAutomation } from '../context/AutomationContext';
-
-function classForStatus(status: string | undefined) {
-  switch (status) {
-    case 'passed':
-    case 'completed':
-      return 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30';
-    case 'failed':
-    case 'error':
-      return 'bg-red-500/15 text-red-200 border-red-500/30';
-    case 'running':
-      return 'bg-blue-500/15 text-blue-200 border-blue-500/30';
-    default:
-      return 'bg-slate-500/10 text-slate-300 border-slate-500/20';
-  }
-}
+import { deriveSavedEntities, statusPillClass } from './maxLevelOps.logic';
 
 function Pill(props: { status?: string; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-medium ${classForStatus(props.status)}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-medium ${statusPillClass(props.status)}`}>
       <CircleDashed className="w-3 h-3" />
       {props.children}
     </span>
   );
 }
 
-function getSavedMap(extractedData: unknown): Record<string, unknown> | null {
-  if (!extractedData || typeof extractedData !== 'object') return null;
-  const saved = (extractedData as { saved?: unknown }).saved;
-  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;
-  return saved as Record<string, unknown>;
-}
-
 export function MaxLevelOpsPage() {
   const { steps, execution } = useAutomation();
 
-  const saved = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (let i = execution.auditLog.length - 1; i >= 0; i--) {
-      const entry = execution.auditLog[i];
-      const s = getSavedMap(entry.extractedData);
-      if (!s) continue;
-      for (const [k, v] of Object.entries(s)) {
-        if (out[k]) continue;
-        if (v === undefined || v === null) continue;
-        out[k] = typeof v === 'string' ? v : JSON.stringify(v);
-      }
-    }
-    return out;
-  }, [execution.auditLog]);
+  const saved = useMemo(() => deriveSavedEntities(execution.auditLog), [execution.auditLog]);
 
   const durationSec =
     execution.startTime && execution.endTime
@@ -151,7 +117,7 @@ export function MaxLevelOpsPage() {
                         </div>
                       )}
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full border text-[10px] capitalize ${classForStatus(st)}`}>
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] capitalize ${statusPillClass(st)}`}>
                       {st || 'pending'}
                     </span>
                   </div>
