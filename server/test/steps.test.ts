@@ -47,6 +47,19 @@ test('cleanNumber keeps digits and the decimal point', () => {
   assert.ok(Number.isNaN(cleanNumber('1.2.3')));
 });
 
+test('cleanNumber preserves a leading minus for negative numbers (regression)', () => {
+  // The sign used to be stripped (kept only [0-9.]), turning -3 into 3.
+  assert.equal(cleanNumber('-3.5'), -3.5);
+  assert.equal(cleanNumber('> -5'), -5);
+  assert.equal(cleanNumber('-$1,200.50'), -1200.5);
+  assert.equal(cleanNumber('Balance: -42'), -42);
+  // A minus *after* the first digit (e.g. a range) is not a sign.
+  assert.equal(cleanNumber('5-3'), 53);
+  // Unchanged positive / no-digit behavior.
+  assert.equal(cleanNumber('> 50'), 50);
+  assert.equal(cleanNumber('none'), 0);
+});
+
 test('evaluateAssertion: equals (default) compares the strings exactly', () => {
   assert.deepEqual(evaluateAssertion('equals', 'Active', 'Active'), { ok: true, reason: '' });
 
@@ -76,6 +89,17 @@ test('evaluateAssertion: greaterThan parses a decimal threshold correctly (regre
   const fail = evaluateAssertion('greaterThan', '> 2.5', '2');
   assert.equal(fail.ok, false);
   assert.equal(fail.reason, 'Assertion failed: expected 2 > 2.5');
+});
+
+test('evaluateAssertion: greaterThan compares negative numbers correctly (regression)', () => {
+  // -3 > -5 is true; with the sign stripped this was evaluated as 3 > 5 (false).
+  assert.equal(evaluateAssertion('greaterThan', '-5', '-3').ok, true);
+  // -1 > 0 is false; stripping the sign evaluated 1 > 0 (true).
+  const fail = evaluateAssertion('greaterThan', '0', '-1');
+  assert.equal(fail.ok, false);
+  assert.equal(fail.reason, 'Assertion failed: expected -1 > 0');
+  // Mixed sign: 2 > -5 holds.
+  assert.equal(evaluateAssertion('greaterThan', '-5', '2').ok, true);
 });
 
 test('evaluateAssertion: greaterThan still handles whole numbers and equality boundary', () => {

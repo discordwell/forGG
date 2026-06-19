@@ -29,9 +29,21 @@ export function parseWaitMs(step: Pick<AutomationStep, 'value' | 'duration'>): n
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 1000;
 }
 
-/** Pull a number out of loose text, keeping digits and the decimal point. */
+/**
+ * Pull a number out of loose text, keeping digits and the decimal point. A
+ * leading minus sign — one that appears before the first digit — is preserved
+ * so negative thresholds/values compare correctly (`"-$3.50"` → `-3.5`,
+ * `"> -5"` → `-5`). Without that, the sign was stripped and `greaterThan`
+ * silently inverted it: `-3 > -5` was evaluated as `3 > 5` and wrongly failed.
+ *
+ * Digit runs are still collapsed, so thousands separators are tolerated
+ * (`"$1,200.50"` → `1200.5`) and no-digit text reads as `0` (a finite,
+ * comparable value), matching the historical behavior.
+ */
 export function cleanNumber(s: string): number {
-  return Number(s.replace(/[^0-9.]/g, ''));
+  const negative = s.split(/[0-9]/, 1)[0].includes('-');
+  const magnitude = Number(s.replace(/[^0-9.]/g, ''));
+  return negative ? -magnitude : magnitude;
 }
 
 export interface AssertionResult {

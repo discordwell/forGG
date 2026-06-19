@@ -24,10 +24,15 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together.
 ## Test
 
 ```bash
-npm test          # server unit + API tests (node:test via tsx, no browser needed)
+npm test          # server + frontend unit/API tests (node:test via tsx)
 npm run typecheck # type-check UI, server, and tests (also part of `npm run build`)
 npm run lint
 ```
+
+Most tests need no browser. The runner's real Playwright path is covered by
+`server/test/runner-browser.test.ts`, which launches a headless Chromium and
+**self-skips** when no browser binary is present (install one with
+`npx playwright install chromium`).
 
 ## What Makes It “Real”
 

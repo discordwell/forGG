@@ -49,7 +49,8 @@ server events streamed over SSE.
   unit-testable without Playwright: sandbox-page path, default audit severity,
   `wait` duration parsing (explicit `0` honored, negatives clamped), and
   assert-step evaluation (`equals`/`contains`/`greaterThan`; the numeric
-  comparison parses decimals on both sides).
+  comparison parses decimals on both sides and preserves a leading minus sign,
+  so negative thresholds/values compare correctly).
 - **`src/db.ts`** — better-sqlite3 (WAL). Tables: `runs`, `events`
   (append-only log, FK to runs, enforced), `kv` (integration store).
 - **`src/sse.ts`** — `RunSseHub`, a per-run set of connected SSE clients.
@@ -132,7 +133,13 @@ passed/total/allPassed/duration), and `lib/ghlLocations.ts` (`parseGhlLocations`
   recording fakes, HTTP routes (`app.inject()` with a fake runner) plus the SSE
   `/events` route against a live server (history replays, then live broadcasts
   stream, in order, with no duplication), and real `Runner` lifecycle tests
-  using wait-only steps (no browser needed).
+  using wait-only steps (no browser needed). A separate
+  `runner-browser.test.ts` drives the runner's *real* Playwright path —
+  navigate / extract / assert / type / click / select / scroll / screenshot
+  against a local fixture page, asserting the event trail, the extracted DOM
+  text, and the screenshot artifact written to disk (plus a failed-assert run).
+  It launches a headless Chromium, so it self-skips when no browser binary is
+  installed, keeping the default suite runnable everywhere.
 - **Frontend:** the full `automationReducer` action surface, the
   `RunController` lifecycle (incl. the regression where stopping a run wedged
   the next "Execute") plus `eventToActions`/`isTerminalEvent`, and the extracted

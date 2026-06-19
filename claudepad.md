@@ -2,6 +2,38 @@
 
 ## Session Summaries
 
+### 2026-06-19 ~06:34 UTC — Real browser-step runner coverage + greaterThan negative-number bugfix
+- **Bug fixed (with regression tests):** the `greaterThan` assert stripped a
+  leading minus sign (`cleanNumber` kept only `[0-9.]`), so `-3 > -5` was
+  evaluated as `3 > 5` and wrongly failed, and `-1 > 0` wrongly passed.
+  Reachable via the public `POST /api/runs` (any `assertion`/`value` string).
+  Fix: `cleanNumber` now detects a minus *before the first digit*
+  (`s.split(/[0-9]/, 1)[0].includes('-')`) and negates the magnitude. All
+  prior behavior is preserved — thousands collapse (`"$1,200.50"`→1200.5),
+  no-digit→0, malformed→NaN (still hits the "uncomparable" branch). Same
+  `greaterThan` feature a prior session fixed for decimals; this closes the
+  negative case. 2 new `steps.test.ts` tests (cleanNumber signs + a negative
+  `evaluateAssertion` comparison).
+- **Biggest test gap closed:** the runner's *entire* Playwright step path
+  (navigate/extract/assert/type/click/select/scroll/screenshot) — the literal
+  heart of the product — had **zero** coverage (only wait-only and mocked-`api`
+  runs were tested). New `server/test/runner-browser.test.ts` drives a real
+  headless Chromium against a self-contained fixture page served by a throwaway
+  `node:http` server (Runner `origin` pointed at it), asserting the full event
+  trail, all-passed step statuses, the extracted DOM text, and that the
+  screenshot artifact is actually written to disk — plus a failed-assert run
+  that ends `run_failed` (real reason `expected 42 > 100`) and never reaches the
+  trailing step. Self-skips (node:test `{ skip }`) when no Chromium binary is
+  present, so the fast default suite stays runnable everywhere. Stable across 5
+  back-to-back runs; full run ~1.3s, failure path ~0.2s.
+- **Verified:** typecheck (4 projects), lint, **143/143 tests** (was 139; +4),
+  full build. An adversarial code-review subagent **monkeypatched
+  `chromium.launch`** to prove the failure test genuinely launches a browser
+  (called exactly once; the `42` in the error can only come from reading the
+  live DOM) and confirmed the skip guard *skips* rather than silently passing —
+  no issues found. Docs updated (ARCHITECTURE testing + steps note, README test
+  note that browser tests auto-skip).
+
 ### 2026-06-18 ~13:00 UTC — GHL location-shape bugfix + component-logic extraction (UI now tested without a DOM)
 - **Bug fixed (with regression test):** the header's GHL location dropdown
   silently dropped any location that arrived with `id` instead of `_id`. The
@@ -229,3 +261,16 @@
   non-idle, so they behave like they did for `completed`. The backend guarantees
   a `step_status:'failed'` precedes every `run_failed`, so the FAILED summary is
   always correct (never a green PASSED on a failed run).
+- The runner's browser-step path is covered by `server/test/runner-browser.test.ts`
+  WITHOUT the rest of the app: a throwaway `node:http` server returns a fixture
+  page for any `/sandbox/*` request, and a `Runner` is constructed with its
+  `origin` pointed at that server (so `navigate` builds
+  `http://127.0.0.1:<port>/sandbox/<page>.html`). No Fastify needed — sidesteps
+  the chicken-and-egg of "Runner needs the origin, which needs the listen port."
+  The browser is owned by `Runner.runOne`'s `finally`, so it's already closed
+  by the time a terminal DB status is observed; the test's own `finally` only
+  tears down the http server, db, and temp dir. The test `{ skip }`s when
+  `chromium.executablePath()` doesn't exist on disk, so the default `npm test`
+  stays browser-free where no binary is installed but gains real coverage where
+  one is. Keep speed high (e.g. `enqueue(..., 8)`) to shrink the runner's
+  artificial per-step `delay()`s.
